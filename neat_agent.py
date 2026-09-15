@@ -3,11 +3,14 @@ import neat
 from PIL import Image, ImageDraw
 from flappy_env import Game, Bird, BIRD_X, WIDTH, HEIGHT, PIPE_GAP
 
+# Configuración generada desde código para evitar problemas de encoding
+# al subir el archivo .txt manualmente a GitHub.
 CONFIG_TEXT = """[NEAT]
-fitness_criterion     = max
-fitness_threshold     = 1000
-pop_size              = 50
-reset_on_extinction   = True
+fitness_criterion       = max
+fitness_threshold       = 1000
+pop_size                = 50
+reset_on_extinction     = True
+no_fitness_termination = False
 
 [DefaultGenome]
 activation_default      = tanh
