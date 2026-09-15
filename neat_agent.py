@@ -162,18 +162,51 @@ def draw_network(genome, config, size=(480, 380)):
     return img
 
 
-def make_eval_function(snapshot_generations, snapshot_store,
-                        max_frames=3000, frame_skip=4, max_capture_frames=300):
-    """Crea la función de evaluación que NEAT llama cada generación.
-    Si la generación actual está en snapshot_generations, además de
-    evaluar el fitness, va grabando frames de TODA la población para
-    poder mostrarlos después como GIF."""
-    counter = {"gen": 0}
+def create_population(config_path, fitness_lists=None):
+    """Crea una nueva población de NEAT desde cero.
+
+    Si se pasa fitness_lists (un dict con listas 'best', 'avg', 'species'),
+    se agrega un reporter que las actualiza automáticamente cada vez que
+    se llama population.run(...), incluso si se llama varias veces por
+    separado (como en el modo de entrenamiento continuo)."""
+    real_config_path = get_config_path()
+    config = neat.Config(
+        neat.DefaultGenome,
+        neat.DefaultReproduction,
+        neat.DefaultSpeciesSet,
+        neat.DefaultStagnation,
+        real_config_path,
+    )
+    population = neat.Population(config)
+    stats = neat.StatisticsReporter()
+    population.add_reporter(stats)
+
+    if fitness_lists is not None:
+        class HistoryReporter(neat.reporting.BaseReporter):
+            def post_evaluate(self, config, pop, species, best_genome):
+                fitnesses = [g.fitness for g in pop.values() if g.fitness is not None]
+                avg_fitness = sum(fitnesses) / len(fitnesses) if fitnesses else 0
+                fitness_lists["best"].append(best_genome.fitness)
+                fitness_lists["avg"].append(avg_fitness)
+                fitness_lists["species"].append(len(species.species))
+
+        population.add_reporter(HistoryReporter())
+
+    return population, config, stats
+
+
+def make_eval_function(should_capture_fn, snapshot_store, gen_counter,
+                        max_frames=3000, frame_skip=4, max_capture_frames=300,
+                        max_snapshots=None):
+    """Función de evaluación genérica. should_capture_fn(gen_num) -> bool
+    decide si esa generación se guarda en snapshot_store (GIF + mejor genoma).
+    Si max_snapshots no es None, se van descartando los snapshots más
+    antiguos para no acumular memoria indefinidamente (modo continuo)."""
 
     def eval_genomes(genomes, config):
-        counter["gen"] += 1
-        current_gen = counter["gen"]
-        capture = current_gen in snapshot_generations
+        gen_counter["gen"] += 1
+        current_gen = gen_counter["gen"]
+        capture = should_capture_fn(current_gen)
 
         birds, nets, ge = [], [], []
         for genome_id, genome in genomes:
@@ -220,20 +253,17 @@ def make_eval_function(snapshot_generations, snapshot_store,
                 "num_alive_end": sum(1 for b in birds if b.alive),
                 "population_size": len(birds),
             }
+            if max_snapshots is not None and len(snapshot_store) > max_snapshots:
+                oldest_key = min(snapshot_store.keys())
+                del snapshot_store[oldest_key]
 
     return eval_genomes
 
 
 def run_neat(config_path, generations=20, progress_callback=None, snapshot_generations=None):
-    real_config_path = get_config_path()
-
-    config = neat.Config(
-        neat.DefaultGenome,
-        neat.DefaultReproduction,
-        neat.DefaultSpeciesSet,
-        neat.DefaultStagnation,
-        real_config_path,
-    )
+    """Modo 1: entrena un número fijo de generaciones, capturando 5
+    'generaciones clave' (1, 25%, 50%, 75%, última) para la galería."""
+    population, config, stats = create_population(config_path)
 
     if snapshot_generations is None:
         snapshot_generations = sorted(set([
@@ -243,30 +273,31 @@ def run_neat(config_path, generations=20, progress_callback=None, snapshot_gener
             max(1, (generations * 3) // 4),
             generations,
         ]))
+    snapshot_set = set(snapshot_generations)
 
     snapshot_store = {}
-    eval_function = make_eval_function(set(snapshot_generations), snapshot_store)
-
-    population = neat.Population(config)
-    stats = neat.StatisticsReporter()
-    population.add_reporter(stats)
+    gen_counter = {"gen": 0}
+    eval_function = make_eval_function(
+        should_capture_fn=lambda g: g in snapshot_set,
+        snapshot_store=snapshot_store,
+        gen_counter=gen_counter,
+    )
 
     if progress_callback:
-        class StreamlitReporter(neat.reporting.BaseReporter):
-            def post_evaluate(self, config, population, species, best_genome):
-                fitnesses = [g.fitness for g in population.values() if g.fitness is not None]
+        class ProgressReporter(neat.reporting.BaseReporter):
+            def post_evaluate(self, config, pop, species, best_genome):
+                fitnesses = [g.fitness for g in pop.values() if g.fitness is not None]
                 avg_fitness = sum(fitnesses) / len(fitnesses) if fitnesses else 0
-                num_species = len(species.species)
-                progress_callback(best_genome.fitness, avg_fitness, num_species)
+                progress_callback(best_genome.fitness, avg_fitness, len(species.species))
 
-        population.add_reporter(StreamlitReporter())
+        population.add_reporter(ProgressReporter())
 
     winner = population.run(eval_function, generations)
     return winner, stats, config, snapshot_store, snapshot_generations
 
 
 def render_genome(genome, config, max_frames=1500):
-    """Reproduce la partida completa de un solo genoma (el ganador final)."""
+    """Reproduce la partida completa de un solo genoma."""
     net = neat.nn.FeedForwardNetwork.create(genome, config)
     bird = Bird()
     game = Game()
