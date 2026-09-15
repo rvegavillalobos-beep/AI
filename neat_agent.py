@@ -1,6 +1,77 @@
+import os
 import neat
 from PIL import Image, ImageDraw
 from flappy_env import Game, Bird, BIRD_X, WIDTH, HEIGHT, PIPE_GAP
+
+CONFIG_TEXT = """[NEAT]
+fitness_criterion     = max
+fitness_threshold     = 1000
+pop_size              = 50
+reset_on_extinction   = True
+
+[DefaultGenome]
+activation_default      = tanh
+activation_mutate_rate  = 0.0
+activation_options      = tanh
+aggregation_default     = sum
+aggregation_mutate_rate = 0.0
+aggregation_options     = sum
+bias_init_mean          = 0.0
+bias_init_stdev         = 1.0
+bias_max_value          = 30.0
+bias_min_value          = -30.0
+bias_mutate_power       = 0.5
+bias_mutate_rate        = 0.7
+bias_replace_rate       = 0.1
+compatibility_disjoint_coefficient = 1.0
+compatibility_weight_coefficient   = 0.5
+conn_add_prob           = 0.5
+conn_delete_prob        = 0.5
+enabled_default         = True
+enabled_mutate_rate     = 0.01
+feed_forward            = True
+initial_connection      = full
+node_add_prob           = 0.2
+node_delete_prob        = 0.2
+num_hidden              = 0
+num_inputs              = 5
+num_outputs             = 1
+response_init_mean      = 1.0
+response_init_stdev     = 0.0
+response_max_value      = 30.0
+response_min_value      = -30.0
+response_mutate_power   = 0.0
+response_mutate_rate    = 0.0
+response_replace_rate   = 0.0
+weight_init_mean        = 0.0
+weight_init_stdev       = 1.0
+weight_max_value        = 30
+weight_min_value        = -30
+weight_mutate_power     = 0.5
+weight_mutate_rate      = 0.8
+weight_replace_rate     = 0.1
+
+[DefaultSpeciesSet]
+compatibility_threshold = 3.0
+
+[DefaultStagnation]
+species_fitness_func = max
+max_stagnation        = 20
+species_elitism       = 2
+
+[DefaultReproduction]
+elitism            = 2
+survival_threshold = 0.2
+"""
+
+
+def get_config_path():
+    """Genera el archivo de config en tiempo de ejecución para evitar
+    problemas de encoding al subirlo manualmente a GitHub."""
+    path = os.path.join(os.path.dirname(__file__), "config-feedforward.txt")
+    with open(path, "w", encoding="utf-8", newline="\\n") as f:
+        f.write(CONFIG_TEXT)
+    return path
 
 
 def eval_genomes(genomes, config):
@@ -14,7 +85,7 @@ def eval_genomes(genomes, config):
         ge.append(genome)
 
     game = Game()
-    max_frames = 1000  # límite de seguridad
+    max_frames = 1000
 
     while game.any_alive(birds) and game.frame < max_frames:
         next_pipe = game.get_next_pipe()
@@ -39,6 +110,8 @@ def eval_genomes(genomes, config):
 
 
 def run_neat(config_path, generations=20, progress_callback=None):
+    config_path = get_config_path()  # sobrescribe siempre con la versión válida
+
     config = neat.Config(
         neat.DefaultGenome,
         neat.DefaultReproduction,
