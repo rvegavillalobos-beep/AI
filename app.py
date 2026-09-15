@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 import os
+import io
 import pandas as pd
 
 from neat_agent import run_neat, render_genome
@@ -43,12 +44,30 @@ if st.button("🚀 Entrenar"):
     st.session_state.config = config
     st.success("¡Entrenamiento completo!")
 
+
+def frames_to_gif_bytes(frames, duration_ms=30, resize_to=(300, 450)):
+    """Convierte una lista de imágenes PIL en un GIF animado en memoria,
+    para mostrarlo de una sola vez en vez de frame por frame (mucho más
+    rápido en Streamlit Cloud)."""
+    resized = [f.resize(resize_to) for f in frames]
+    buf = io.BytesIO()
+    resized[0].save(
+        buf,
+        format="GIF",
+        save_all=True,
+        append_images=resized[1:],
+        duration=duration_ms,
+        loop=0,
+    )
+    buf.seek(0)
+    return buf
+
+
 if st.session_state.winner is not None:
     st.subheader("🏆 Mejor genoma entrenado")
     if st.button("▶️ Ver al mejor pájaro jugar"):
-        frames = render_genome(st.session_state.winner, st.session_state.config)
-        placeholder = st.empty()
-        for frame in frames:
-            placeholder.image(frame)
-            time.sleep(0.03)
-        st.info(f"Sobrevivió {len(frames)} frames y pasó tuberías con éxito.")
+        with st.spinner("Generando animación..."):
+            frames = render_genome(st.session_state.winner, st.session_state.config)
+            gif_bytes = frames_to_gif_bytes(frames, duration_ms=30)
+        st.image(gif_bytes)
+        st.info(f"Sobrevivió {len(frames)} frames.")
