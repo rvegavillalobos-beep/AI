@@ -87,7 +87,7 @@ def eval_genomes(genomes, config):
         ge.append(genome)
 
     game = Game()
-    max_frames = 1000
+    max_frames = 3000
 
     while game.any_alive(birds) and game.frame < max_frames:
         next_pipe = game.get_next_pipe()
@@ -129,7 +129,9 @@ def run_neat(config_path, generations=20, progress_callback=None):
     if progress_callback:
         class StreamlitReporter(neat.reporting.BaseReporter):
             def post_evaluate(self, config, population, species, best_genome):
-                progress_callback(best_genome.fitness)
+                fitnesses = [g.fitness for g in population.values() if g.fitness is not None]
+                avg_fitness = sum(fitnesses) / len(fitnesses) if fitnesses else 0
+                progress_callback(best_genome.fitness, avg_fitness)
 
         population.add_reporter(StreamlitReporter())
 
@@ -137,7 +139,7 @@ def run_neat(config_path, generations=20, progress_callback=None):
     return winner, stats, config
 
 
-def render_genome(genome, config, max_frames=600):
+def render_genome(genome, config, max_frames=1500):
     net = neat.nn.FeedForwardNetwork.create(genome, config)
     bird = Bird()
     game = Game()
