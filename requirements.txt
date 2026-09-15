@@ -1,0 +1,5 @@
+streamlit
+neat-python
+pillow
+pandas
+numpy
