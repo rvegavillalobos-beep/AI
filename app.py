@@ -31,11 +31,15 @@ if st.button("🚀 Entrenar"):
     st.session_state.fitness_history = []
     progress_bar = st.progress(0)
     chart_placeholder = st.empty()
+    gen_label = st.empty()
 
     def callback(fitness):
         st.session_state.fitness_history.append(fitness)
-        progress_bar.progress(min(len(st.session_state.fitness_history) / generations, 1.0))
+        current_gen = len(st.session_state.fitness_history)
+        progress_bar.progress(min(current_gen / generations, 1.0))
+        gen_label.text(f"Generación {current_gen}/{generations} — mejor fitness: {fitness:.2f}")
         chart_placeholder.line_chart(pd.DataFrame({"mejor fitness": st.session_state.fitness_history}))
+        time.sleep(0.15)  # pausa artificial solo para que se vea la animación
 
     with st.spinner("Entrenando población..."):
         winner, stats, config = run_neat(CONFIG_PATH, generations, progress_callback=callback)
@@ -47,8 +51,7 @@ if st.button("🚀 Entrenar"):
 
 def frames_to_gif_bytes(frames, duration_ms=30, resize_to=(300, 450)):
     """Convierte una lista de imágenes PIL en un GIF animado en memoria,
-    para mostrarlo de una sola vez en vez de frame por frame (mucho más
-    rápido en Streamlit Cloud)."""
+    para mostrarlo de una sola vez en vez de frame por frame."""
     resized = [f.resize(resize_to) for f in frames]
     buf = io.BytesIO()
     resized[0].save(
