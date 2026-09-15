@@ -70,8 +70,9 @@ survival_threshold = 0.2
 def get_config_path():
     tmp_dir = tempfile.gettempdir()
     path = os.path.join(tmp_dir, "config-feedforward-generated.txt")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(CONFIG_TEXT)
+    f = open(path, "w", encoding="utf-8")
+    f.write(CONFIG_TEXT)
+    f.close()
     return path
 
 
@@ -111,14 +112,14 @@ def eval_genomes(genomes, config):
 
 
 def run_neat(config_path, generations=20, progress_callback=None):
-    config_path = get_config_path()
+    real_config_path = get_config_path()
 
     config = neat.Config(
         neat.DefaultGenome,
         neat.DefaultReproduction,
         neat.DefaultSpeciesSet,
         neat.DefaultStagnation,
-        config_path,
+        real_config_path,
     )
 
     population = neat.Population(config)
