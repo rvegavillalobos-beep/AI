@@ -1,4 +1,5 @@
 import os
+import tempfile
 import neat
 from PIL import Image, ImageDraw
 from flappy_env import Game, Bird, BIRD_X, WIDTH, HEIGHT, PIPE_GAP
@@ -69,10 +70,11 @@ survival_threshold = 0.2
 
 
 def get_config_path():
-    """Genera el archivo de config en tiempo de ejecución para evitar
-    problemas de encoding al subirlo manualmente a GitHub."""
-    path = os.path.join(os.path.dirname(__file__), "config-feedforward.txt")
-    with open(path, "w", encoding="utf-8", newline="\\n") as f:
+    """Genera el archivo de config en una carpeta temporal del sistema
+    (siempre escribible), evitando problemas de permisos y de encoding."""
+    tmp_dir = tempfile.gettempdir()
+    path = os.path.join(tmp_dir, "config-feedforward-generated.txt")
+    with open(path, "w", encoding="utf-8") as f:
         f.write(CONFIG_TEXT)
     return path
 
