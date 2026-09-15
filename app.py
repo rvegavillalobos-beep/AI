@@ -20,6 +20,8 @@ CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config-feedforward.txt")
 
 if "fitness_history" not in st.session_state:
     st.session_state.fitness_history = []
+if "avg_fitness_history" not in st.session_state:
+    st.session_state.avg_fitness_history = []
 if "winner" not in st.session_state:
     st.session_state.winner = None
 if "config" not in st.session_state:
@@ -29,17 +31,25 @@ generations = st.slider("Número de generaciones a entrenar", 5, 100, 20)
 
 if st.button("🚀 Entrenar"):
     st.session_state.fitness_history = []
+    st.session_state.avg_fitness_history = []
     progress_bar = st.progress(0)
-    chart_placeholder = st.empty()
     gen_label = st.empty()
+    chart_placeholder = st.empty()
 
-    def callback(fitness):
-        st.session_state.fitness_history.append(fitness)
+    def callback(best_fitness, avg_fitness):
+        st.session_state.fitness_history.append(best_fitness)
+        st.session_state.avg_fitness_history.append(avg_fitness)
         current_gen = len(st.session_state.fitness_history)
         progress_bar.progress(min(current_gen / generations, 1.0))
-        gen_label.text(f"Generación {current_gen}/{generations} — mejor fitness: {fitness:.2f}")
-        chart_placeholder.line_chart(pd.DataFrame({"mejor fitness": st.session_state.fitness_history}))
-        time.sleep(0.15)  # pausa artificial solo para que se vea la animación
+        gen_label.text(
+            f"Generación {current_gen}/{generations} — "
+            f"mejor: {best_fitness:.2f} | promedio: {avg_fitness:.2f}"
+        )
+        chart_placeholder.line_chart(pd.DataFrame({
+            "mejor fitness": st.session_state.fitness_history,
+            "fitness promedio": st.session_state.avg_fitness_history,
+        }))
+        time.sleep(0.15)
 
     with st.spinner("Entrenando población..."):
         winner, stats, config = run_neat(CONFIG_PATH, generations, progress_callback=callback)
