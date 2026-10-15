@@ -279,7 +279,7 @@ def module_drawing(row: pd.Series, nominals: Nominals, limit: float, exaggeratio
                            yshift=24 if y0 < 0 else -24,
                            font=dict(size=12, color=P.status("FAIL") if out else P.ink["primary"]),
                            bgcolor=T.rgba(P.ink["surface"], 0.85))
-    if len(pts) >= 2:
+    if len(pts) == len(CORNERS):  # no outline from a partial measurement (missing corners are labelled)
         mx, my = polygon(pts)
         color = P.status("FAIL") if row.get("Status") != "PASS" else P.status("PASS")
         fig.add_trace(go.Scatter(x=mx, y=my, mode="lines+markers", name="Measured", line=dict(color=color, width=3),
