@@ -4,7 +4,7 @@ import streamlit as st
 from app import data, state, ui
 from rickhard import patterns
 from rickhard.charts import patterns_charts as cpt
-from rickhard.stats import significance_label
+from rickhard.stats import significance_label, welch
 
 c = data.ctx()
 a, r = c.a, c.rules
@@ -61,18 +61,21 @@ with ctl[2]:
     svar = st.selectbox("Compare", list(var_opts), key="p_pt_svar")
 eff = patterns.startup_effect(f, gap, int(k))
 flags = patterns.startup_flags(f, gap, int(k))
+scol, sunit = var_opts[svar]
 if eff:
-    d = eff["fpy_steady"] - eff["fpy_startup"]
+    d = eff["fpy_startup"] - eff["fpy_steady"]
+    vals = f[scol].to_numpy(float)
+    vdiff, vp = welch(vals[~flags], vals[flags]) if flags.any() and (~flags).any() else (np.nan, np.nan)
     ui.kpi_cards([
         {"label": "FPY · first modules after a stop", "value": ui.fmt_pct(eff["fpy_startup"]),
          "sub": f"{eff['n_startup']:,} modules"},
         {"label": "FPY · steady running", "value": ui.fmt_pct(eff["fpy_steady"]), "sub": f"{eff['n_steady']:,} modules"},
-        {"label": "Difference", "value": f"{d:+.1f} pp", "sub": significance_label(eff["p_value"]),
+        {"label": "Start-up vs steady (FPY)", "value": f"{d:+.1f} pp", "sub": significance_label(eff["p_value"]),
          "good": None},
-        {"label": "Shift X at start-up", "value": ui.fmt_mm(eff.get("Fit_Tx_shift", np.nan)),
-         "sub": significance_label(eff.get("Fit_Tx_p", np.nan))},
+        {"label": f"Start-up vs steady ({svar})",
+         "value": f"{vdiff:+.2f}" if np.isfinite(vdiff) else "—", "unit": sunit if np.isfinite(vdiff) else "",
+         "sub": significance_label(vp)},
     ])
-scol, sunit = var_opts[svar]
 ui.chart(cpt.startup_compare(f, flags, scol, svar, sunit), "pt_startup")
 st.caption("If start-up modules land differently, look at what changes after a stop: end-stop damping or "
            "temperature, conveyor acceleration, the first-part routine.")
