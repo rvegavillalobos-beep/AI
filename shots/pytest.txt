@@ -1,0 +1,18 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.7.0
+rootdir: /home/runner/work/AI/AI
+configfile: pytest.ini
+testpaths: tests
+plugins: anyio-4.15.1
+collected 102 items
+
+tests/test_analytics.py ...............                                  [ 14%]
+tests/test_app_smoke.py ..................                               [ 32%]
+tests/test_charts.py ..                                                  [ 34%]
+tests/test_compensation.py .......                                       [ 41%]
+tests/test_geometry.py .............                                     [ 53%]
+tests/test_loading.py ........................                           [ 77%]
+tests/test_parity.py ....................                                [ 97%]
+tests/test_reports.py ...                                                [100%]
+
+======================== 102 passed in 66.97s (0:01:06) ========================
