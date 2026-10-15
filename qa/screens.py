@@ -43,7 +43,7 @@ with sync_playwright() as p:
     shoot(page, f"{OUT}/00_start.png")
     for i, key in enumerate(PAGES, 1):
         try:
-            page.goto(f"{BASE}/{key}?demo")
+            page.goto(f"{BASE}/?demo" if key == "command" else f"{BASE}/{key}?demo")
             wait_idle(page)
             shoot(page, f"{OUT}/{i:02d}_{key}.png")
             main = page.locator("[data-testid='stMain']")
@@ -60,7 +60,7 @@ with sync_playwright() as p:
             log.append(f"{key}: screenshot failed: {e!s:.300}")
     try:
         page.set_viewport_size({"width": 390, "height": 844})
-        page.goto(f"{BASE}/command?demo")
+        page.goto(f"{BASE}/?demo")
         wait_idle(page)
         shoot(page, f"{OUT}/90_command_phone.png", width=390)
     except Exception as e:  # noqa: BLE001
