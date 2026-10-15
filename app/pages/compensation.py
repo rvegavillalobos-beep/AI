@@ -119,7 +119,10 @@ st.dataframe(mt, hide_index=True, width="stretch", column_config={
                                       help="Modules that would still pass with every corner limit tightened by the "
                                            "safety margin (set it in More)."),
     "Δ vs none": cfg.NumberColumn("Δ vs none (pp)", format="%+.1f"),
-    "Backtest": cfg.NumberColumn("FPY backtest", format="%.1f%%")})
+    "Backtest": cfg.NumberColumn("FPY backtest", format="%.1f%%",
+                                 help="Each recent week judged with the setting this method computes from the "
+                                      "weeks before it. Manual values are not computed from data, so they have "
+                                      "no backtest (empty).")})
 
 choices = [m for m in ("Robust optimum", "Rigid fit (mean)", "Median-based", "Manual") if m in settings]
 state.ensure_option(f"p_cp_apply_{t}", choices, choices[0])

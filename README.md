@@ -22,6 +22,40 @@ square?), median-based and optimised compensation with a backtest — with the s
 (checked by the test suite against the original code). The Excel export keeps the original sheet names
 (`Module_Summary_Report`, `First_Run_Quality_Summary`, `Weekly_FPY_Trend`, …), so anything built on it keeps working.
 
+![Command Center: FPY against target, findings in plain language and a ranked action plan](docs/img/command-center.png)
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/img/compensation-studio.png" alt="Compensation Studio"></td>
+    <td width="50%"><img src="docs/img/shape-squareness.png" alt="Shape and Squareness"></td>
+  </tr>
+  <tr>
+    <td><b>Compensation Studio</b> — median, rigid-fit, robust and your own X / Y / yaw side by side, with a
+      backtest and a work instruction for the line.</td>
+    <td><b>Shape &amp; Squareness</b> — would each NOK have passed if the module were square, or placed
+      perfectly?</td>
+  </tr>
+  <tr>
+    <td><img src="docs/img/error-anatomy.png" alt="Error Anatomy"></td>
+    <td><img src="docs/img/geometry.png" alt="Geometry"></td>
+  </tr>
+  <tr>
+    <td><b>Error Anatomy</b> — the eight physical modes behind every deviation: systematic vs random, and
+      which ones drive NOK.</td>
+    <td><b>Geometry</b> — every module drawn against its nominal outline, magnified; click a module to
+      focus on it.</td>
+  </tr>
+</table>
+
+<details>
+<summary>Dark theme</summary>
+
+![Command Center in the dark theme](docs/img/command-center-dark.png)
+
+</details>
+
+*Screenshots show the built-in demo data (synthetic numbers).*
+
 ## Run it
 
 **Streamlit Community Cloud:** *Create app* → repository `rvegavillalobos-beep/AI`, branch `main`, main file
