@@ -19,11 +19,11 @@ def centroid_path(vec: pd.DataFrame, split_by_type: bool = True, title: str | No
         return T.empty("No modules.")
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=[0], y=[0], mode="markers+text", marker=dict(color=P.target, size=14, symbol="cross"),
-                             text=["nominal"], textposition="top center", name="Nominal center",
+                             text=["nominal"], textposition="bottom left", name="Nominal center",
                              textfont=dict(color=P.ink["secondary"])))
     groups = ([(t, vec[vec["BatteryType"] == t]) for t in sorted(vec["BatteryType"].unique())]
               if split_by_type else [("All", vec)])
-    for t, d in groups:
+    for gi, (t, d) in enumerate(groups):
         color = P.type(t) if t != "All" else P.accent
         fig.add_trace(go.Scattergl(
             x=d["Centroid_X"], y=d["Centroid_Y"], mode="markers", name=f"Modules ({t})",
@@ -36,8 +36,8 @@ def centroid_path(vec: pd.DataFrame, split_by_type: bool = True, title: str | No
         fig.add_trace(go.Scatter(
             x=w["X"], y=w["Y"], mode="lines+markers+text", name=f"Weekly path ({t})",
             line=dict(color=color, width=2.5), marker=dict(size=10, color=color, line=dict(color=P.ink["surface"], width=2)),
-            text=[lab if i in (0, len(w) - 1) else "" for i, lab in enumerate(w["CalendarWeek"])],
-            textposition="top right", textfont=dict(size=11, color=P.ink["primary"]),
+            text=[lab if i == len(w) - 1 else "" for i, lab in enumerate(w["CalendarWeek"])],  # where it is now
+            textposition="top right" if gi % 2 == 0 else "bottom right", textfont=dict(size=11, color=color),
             customdata=np.stack([w["N"], w["CalendarWeek"]], axis=1),
             hovertemplate="<b>%{customdata[1]}</b> (" + t + ")<br>mean X %{x:+.2f} · Y %{y:+.2f} mm<br>"
                           "%{customdata[0]} modules<extra></extra>"))
@@ -51,8 +51,7 @@ def magnitude_yaw(vec: pd.DataFrame, title: str | None = None, height: int = 520
     P = T.pal()
     if vec.empty:
         return T.empty("No modules.")
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.12,
-                        subplot_titles=("Mean centroid offset R (mm)", "Module yaw (°)"))
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08)
     w = (vec.groupby(["WeekKey", "CalendarWeek"]).agg(R=("Vector_Magnitude", "mean"), N=("PartID", "count"))
          .reset_index().sort_values("WeekKey"))
     fig.add_trace(go.Bar(x=w["CalendarWeek"], y=w["R"], marker_color=P.accent, name="Mean R", customdata=w["N"],
@@ -71,8 +70,9 @@ def magnitude_yaw(vec: pd.DataFrame, title: str | None = None, height: int = 520
     fig.update_xaxes(type="category", categoryorder="array", categoryarray=w["CalendarWeek"].tolist(), row=1, col=1)
     fig.update_xaxes(type="category", categoryorder="array", categoryarray=w["CalendarWeek"].tolist(),
                      title_text="Calendar week", row=2, col=1)
-    fig.update_yaxes(title_text="mm", row=1, col=1)
-    fig.update_yaxes(title_text="°", row=2, col=1)
+    T.thin_ticks(fig, w["CalendarWeek"].tolist(), max_ticks=8, row=2, col=1)
+    fig.update_yaxes(title_text="Mean offset R (mm)", row=1, col=1)
+    fig.update_yaxes(title_text="Module yaw (°)", row=2, col=1)
     fig.update_layout(bargap=0.4)
     return T.style(fig, height=height, title=title, legend_bottom=True)
 
@@ -88,8 +88,7 @@ def placement_timeseries(first: pd.DataFrame, bat_type: str, cps: dict | None = 
     d = first[first["BatteryType"] == bat_type].sort_values("Date")
     if d.empty:
         return T.empty("No modules.")
-    fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.07,
-                        subplot_titles=[f"{lab} ({u})" for _, lab, u in PLACEMENT_VARS])
+    fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.05)
     color = P.type(bat_type)
     for i, (col, lab, unit) in enumerate(PLACEMENT_VARS, start=1):
         s = d[["Date", col, "PartID", "Status"]].dropna(subset=[col]).reset_index(drop=True)
@@ -115,12 +114,7 @@ def placement_timeseries(first: pd.DataFrame, bat_type: str, cps: dict | None = 
                 if kk < len(s):
                     fig.add_vline(x=s["Date"].iloc[kk], line=dict(color=P.ink["primary"], width=1, dash="dot"), row=i, col=1)
         T.hline(fig, 0, P.ink["axis"], "solid", 1, None, row=i, col=1)
-        fig.update_yaxes(title_text=unit, row=i, col=1)
+        fig.update_yaxes(title_text=f"{lab} ({unit})", row=i, col=1)
     if events is not None and len(events):
-        for _, e in events.iterrows():
-            for i in range(1, 4):
-                fig.add_vline(x=e["Date"], line=dict(color=P.event, width=1.5, dash="dash"), row=i, col=1)
-            fig.add_annotation(x=e["Date"], y=0.98, xref="x", yref="y domain", text="◆ " + T.short(e["Title"], 26),
-                               showarrow=False, xanchor="left", yanchor="top", xshift=3,
-                               font=dict(size=10, color=P.ink["secondary"]), bgcolor=T.rgba(P.ink["surface"], 0.75))
+        T.event_marks(fig, events["Date"], events["Title"], rows=[1, 2, 3])
     return T.style(fig, height=height, title=title, legend_bottom=True)

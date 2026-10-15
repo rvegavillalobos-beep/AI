@@ -205,7 +205,7 @@ def waterfall(wf: pd.DataFrame, target: float, title: str | None = None, height:
     if wf is None or wf.empty:
         return T.empty("No data.")
     measures = ["absolute"] + ["relative"] * (len(wf) - 1) + ["total"]
-    x = list(wf["Step"]) + ["Scenario"]
+    x = [str(v).replace(" −", "<br>−") for v in wf["Step"]] + ["Scenario"]
     y = [wf["FPY"].iloc[0]] + list(wf["Delta"].iloc[1:]) + [wf["FPY"].iloc[-1]]
     text = [f"{wf['FPY'].iloc[0]:.1f}%"] + [f"{d:+.1f}" for d in wf["Delta"].iloc[1:]] + [f"{wf['FPY'].iloc[-1]:.1f}%"]
     fig = go.Figure(go.Waterfall(
@@ -214,9 +214,10 @@ def waterfall(wf: pd.DataFrame, target: float, title: str | None = None, height:
         increasing=dict(marker=dict(color=T.STATUS["good"])), decreasing=dict(marker=dict(color=T.STATUS["critical"])),
         totals=dict(marker=dict(color=P.accent)),
         hovertemplate="%{x}: %{text}<extra></extra>", showlegend=False))
-    T.hline(fig, target, P.target, "dot", 2, f"Target {target:.0f}%", "top left")
+    T.hline(fig, target, P.target, "dot", 2, f"Target {target:.0f}%", "top right")
     lo = max(0.0, float(wf["FPY"].min()) - 10)
     fig.update_yaxes(range=[lo, 104], ticksuffix="%", title_text="FPY")
+    fig.update_xaxes(tickangle=0)
     return T.style(fig, height=height, title=title, legend=False)
 
 
@@ -254,17 +255,12 @@ def event_timeline(roll: pd.DataFrame, events: pd.DataFrame, label: str, unit: s
     if target is not None:
         T.hline(fig, target, P.target, "dot", 2, f"Target {target:.0f}%", "bottom right")
     if events is not None and len(events):
-        for _, e in events.iterrows():
-            is_h = highlight is not None and pd.Timestamp(e["Date"]) == pd.Timestamp(highlight)
-            fig.add_vline(x=e["Date"], line=dict(color=P.event, width=3 if is_h else 1.5, dash="solid" if is_h else "dash"))
-            label_txt = T.short(e["Title"], 30)
-            fig.add_annotation(x=e["Date"], y=1.0, yref="paper", text=("◆ <b>" + label_txt + "</b>") if is_h else ("◆ " + label_txt),
-                               showarrow=False, xanchor="left", yanchor="bottom",
-                               font=dict(size=10, color=P.ink["secondary"]))
+        T.event_marks(fig, pd.to_datetime(events["Date"]), events["Title"],
+                      highlight=pd.Timestamp(highlight) if highlight is not None else None)
     for d in cps_dates or []:
         fig.add_vline(x=d, line=dict(color=P.ink["primary"], width=1, dash="dot"))
     fig.update_yaxes(title_text=f"{label} ({unit})" if unit != "%" else label, ticksuffix="%" if unit == "%" else None)
-    return T.style(fig, height=height, title=title, margin=dict(t=64))
+    return T.style(fig, height=height, title=title)
 
 
 def before_after_dist(before, after, label: str, unit: str, title: str | None = None, height: int = 280) -> go.Figure:

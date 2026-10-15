@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import html
+import math
 import re
 
 import numpy as np
 import pandas as pd
 import streamlit as st
 
+from rickhard.charts import svg
 from rickhard.charts import theme as T
 from rickhard.constants import DEV_COLS
 
@@ -36,15 +38,21 @@ CSS = """
   .block-container {padding-top: 1.6rem; padding-bottom: 3rem; max-width: 1500px;}
   [data-testid="stMetricValue"] {font-size: 1.6rem;}
   .rx-scope {opacity: .68; font-size: .88rem; margin: -.55rem 0 1rem 0;}
-  .rx-kpis {display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: .2rem 0 1rem 0;}
+  .rx-kpiwrap {container-type: inline-size;}
+  .rx-kpis {display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 12px; margin: .2rem 0 1rem 0;}
+  @container (max-width: 900px) {.rx-kpis {grid-template-columns: repeat(var(--n2), minmax(0, 1fr));}}
+  @container (max-width: 540px) {.rx-kpis {grid-template-columns: repeat(2, minmax(0, 1fr));}}
+  @container (max-width: 300px) {.rx-kpis {grid-template-columns: minmax(0, 1fr);}}
   .rx-card {border: 1px solid rgba(128,128,128,.22); border-radius: 14px; padding: 14px 16px 12px 16px;
-            background: rgba(128,128,128,.04); position: relative; overflow: hidden;}
+            background: rgba(128,128,128,.04); position: relative; overflow: hidden; min-width: 0;}
   .rx-card .lab {font-size: .78rem; opacity: .72; letter-spacing: .01em;}
-  .rx-card .val {font-size: 1.85rem; font-weight: 650; line-height: 1.15; margin-top: 2px;}
+  .rx-card .row {display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 10px;}
+  .rx-card .val {font-size: 1.85rem; font-weight: 650; line-height: 1.15; margin-top: 2px; overflow-wrap: anywhere;}
+  .rx-card .val.m {font-size: 1.5rem;} .rx-card .val.s {font-size: 1.22rem;}
   .rx-card .val small {font-size: .9rem; font-weight: 500; opacity: .7;}
   .rx-card .dlt {font-size: .82rem; font-weight: 600; margin-top: 2px;}
   .rx-card .sub {font-size: .76rem; opacity: .66; margin-top: 2px;}
-  .rx-card .spk {position: absolute; right: 10px; top: 10px; opacity: .95;}
+  .rx-card .spk img {display: block; opacity: .95;}
   .rx-card .bar {position: absolute; left: 0; top: 0; bottom: 0; width: 4px;}
   .rx-ins {border: 1px solid rgba(128,128,128,.20); border-left-width: 4px; border-radius: 10px;
            padding: 9px 12px; margin: 0 0 8px 0; background: rgba(128,128,128,.03);}
@@ -64,7 +72,7 @@ CSS = """
            border: 1px solid rgba(128,128,128,.3); margin-left: 6px; opacity: .85;}
   .rx-hero h1 {font-size: 2.6rem; margin-bottom: .2rem;}
   .rx-hero p {font-size: 1.05rem; opacity: .8; max-width: 760px;}
-  .rx-feat {display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: .6rem;}
+  .rx-feat {display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; margin-top: .6rem;}
   .rx-feat div {border: 1px solid rgba(128,128,128,.2); border-radius: 12px; padding: 12px 14px; font-size: .88rem;
                 line-height: 1.45; background: rgba(128,128,128,.03);}
   .rx-feat b {display: block; margin-bottom: 3px; font-size: .95rem;}
@@ -72,6 +80,7 @@ CSS = """
   .rx-chk .ok {color: #0ca30c; font-weight: 700;} .rx-chk .no {color: #d03b3b; font-weight: 700;}
   .rx-chk .d {opacity: .7; font-size: .82rem;}
   .rx-svg {border: 1px solid rgba(128,128,128,.2); border-radius: 12px; padding: 8px; background: rgba(128,128,128,.03);}
+  .rx-svg img {display: block; width: 100%; height: auto; margin: 0 auto;}
 </style>
 """
 
@@ -87,7 +96,15 @@ def md_bold(text: str) -> str:
 
 
 def fmt_pct(v, nd: int = 1) -> str:
-    return "–" if v is None or not np.isfinite(v) else f"{v:.{nd}f}%"
+    if v is None or not np.isfinite(v):
+        return "–"
+    if 0 < abs(v) < 10 ** -nd:  # a few modules must not read as 0.0 %
+        return f"<{10 ** -nd:g}%"
+    return f"{v:.{nd}f}%"
+
+
+def plural(n: int, word: str, words: str | None = None) -> str:
+    return f"{n:,} {word if n == 1 else (words or word + 's')}"
 
 
 def fmt_mm(v, nd: int = 2, signed: bool = True) -> str:
@@ -125,24 +142,31 @@ def require(df, what: str = "modules") -> None:
 # ---------------------------------------------------------------------------
 
 def kpi_cards(cards: list[dict]) -> None:
-    """cards: {label, value, unit?, delta?, good? (True/False/None), sub?, spark?, accent?}"""
-    out = ["<div class='rx-kpis'>"]
+    """cards: {label, value, unit?, delta?, good? (True/False/None), sub?, spark? (SVG), accent?}
+
+    One row when there is room, otherwise balanced rows (6 → 3 + 3, 5 → 3 + 2)."""
+    n = max(1, len(cards))
+    out = [f"<div class='rx-kpiwrap'><div class='rx-kpis' style='--n:{n};--n2:{math.ceil(n / 2)}'>"]
     for c in cards:
         color = {True: T.STATUS["good"], False: T.STATUS["critical"]}.get(c.get("good"), "inherit")
         arrow = ""
         if c.get("delta"):
-            arrow = "▲ " if str(c["delta"]).strip().startswith("+") else ("▼ " if str(c["delta"]).strip().startswith(("−", "-")) else "")
+            d = str(c["delta"]).strip()
+            arrow = "▲ " if d.startswith("+") else ("▼ " if d.startswith(("−", "-")) else "")
         bar = f"<div class='bar' style='background:{c['accent']}'></div>" if c.get("accent") else ""
         unit = f" <small>{html.escape(str(c['unit']))}</small>" if c.get("unit") else ""
+        value = str(c["value"])
+        size = "" if len(value) <= 9 else (" m" if len(value) <= 13 else " s")
+        spark = (f"<div class='spk'>{svg.as_img(c['spark'], 'trend', 'width:104px;height:30px')}</div>"
+                 if c.get("spark") else "")
         out.append(
             "<div class='rx-card'>" + bar
             + f"<div class='lab'>{html.escape(str(c['label']))}</div>"
-            + f"<div class='val'>{html.escape(str(c['value']))}{unit}</div>"
+            + f"<div class='row'><div class='val{size}'>{html.escape(value)}{unit}</div>{spark}</div>"
             + (f"<div class='dlt' style='color:{color}'>{arrow}{html.escape(str(c['delta']))}</div>" if c.get("delta") else "")
             + (f"<div class='sub'>{md_bold(c['sub'])}</div>" if c.get("sub") else "")
-            + (f"<div class='spk'>{c['spark']}</div>" if c.get("spark") else "")
             + "</div>")
-    out.append("</div>")
+    out.append("</div></div>")
     st.html("".join(out))
 
 
@@ -182,8 +206,8 @@ def checklist(items: list[dict]) -> None:
     st.html("".join(rows))
 
 
-def svg_box(svg: str) -> None:
-    st.html(f"<div class='rx-svg'>{svg}</div>")
+def svg_box(drawing: str, alt: str = "", max_width: int = 640) -> None:
+    st.html(f"<div class='rx-svg'>{svg.as_img(drawing, alt, f'max-width:{max_width}px')}</div>")
 
 
 # ---------------------------------------------------------------------------

@@ -24,7 +24,7 @@ with np.errstate(invalid="ignore"):
 mod_out = out.any(axis=1)
 ui.kpi_cards([
     {"label": "Modules with a corner out of Z limits", "value": ui.fmt_pct(mod_out.mean() * 100),
-     "sub": f"{int(mod_out.sum())} modules · limits {zl:+g} / {zh:+g} mm"},
+     "sub": f"{ui.plural(int(mod_out.sum()), 'module')} · limits {zl:+g} / {zh:+g} mm"},
     {"label": "Mean level", "value": ui.fmt_mm(np.nanmean(f["Z_Level"]), 2), "sub": f"σ {np.nanstd(f['Z_Level']):.2f} mm"},
     {"label": "Mean pitch (front ↔ rear)", "value": f"{np.nanmean(f['Z_Pitch']):+.2f}", "unit": "mm/m",
      "sub": f"σ {np.nanstd(f['Z_Pitch']):.2f} mm/m"},

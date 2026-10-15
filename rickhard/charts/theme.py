@@ -10,6 +10,7 @@ dark surface.
 from __future__ import annotations
 
 import math
+import threading
 
 import numpy as np
 import plotly.graph_objects as go
@@ -122,16 +123,16 @@ class Palette:
         return [[0.0, self.c["blue"]], [0.5, self.ink["neutral"]], [1.0, self.c["red"]]]
 
 
-P = Palette(False)
+_LIGHT, _DARK = Palette(False), Palette(True)
+_state = threading.local()  # one palette per thread: concurrent sessions may use different themes
 
 
 def set_dark(dark: bool) -> None:
-    global P
-    P = Palette(bool(dark))
+    _state.palette = _DARK if dark else _LIGHT
 
 
 def pal() -> Palette:
-    return P
+    return getattr(_state, "palette", _LIGHT)
 
 
 def rgba(hex_color: str, alpha: float) -> str:
@@ -144,9 +145,25 @@ def rgba(hex_color: str, alpha: float) -> str:
 # Layout
 # ---------------------------------------------------------------------------
 
+def _top_label_shift(fig: go.Figure) -> float | None:
+    """Largest y-shift of labels sitting on top of the plot area (subplot
+    titles, event labels), or None when there are none."""
+    shift = None
+    for a in fig.layout.annotations or ():
+        if (a.yref == "paper" and a.y is not None and a.y >= 0.97 and a.yanchor == "bottom"
+                and a.showarrow is False):
+            shift = max(shift or 0.0, float(a.yshift or 0.0))
+    return shift
+
+
 def style(fig: go.Figure, height: int | None = None, title: str | None = None, legend: bool = True,
           margin: dict | None = None, hovermode: str | None = None, legend_bottom: bool = False) -> go.Figure:
+    top_shift = _top_label_shift(fig)
+    if top_shift is not None and legend:
+        legend_bottom = True  # a legend on top would sit on the labels
     m = dict(l=8, r=8, t=44 if (title or (legend and not legend_bottom)) else 12, b=8)
+    if top_shift is not None:
+        m["t"] = max(m["t"], (58 if title else 30) + int(top_shift))
     if margin:
         m.update(margin)
     fig.update_layout(
@@ -185,7 +202,7 @@ def report_style(fig: go.Figure) -> go.Figure:
 def empty(message: str, height: int = 260) -> go.Figure:
     fig = go.Figure()
     fig.add_annotation(text=message, x=0.5, y=0.5, xref="paper", yref="paper", showarrow=False,
-                       font=dict(size=13, color=P.ink["muted"]))
+                       font=dict(size=13, color=pal().ink["muted"]))
     fig.update_xaxes(visible=False)
     fig.update_yaxes(visible=False)
     return style(fig, height=height, legend=False)
@@ -194,14 +211,48 @@ def empty(message: str, height: int = 260) -> go.Figure:
 def hline(fig, y, color, dash="dash", width=1.5, text=None, pos="top right", row=None, col=None):
     kw = {"row": row, "col": col} if row is not None else {}
     if text:
+        P = pal()
         kw.update(annotation_text=text, annotation_position=pos,
-                  annotation_font=dict(size=10, color=P.ink["secondary"]))
+                  annotation_font=dict(size=10, color=P.ink["secondary"]),
+                  annotation_bgcolor=rgba(P.ink["surface"], 0.8))
     fig.add_hline(y=y, line=dict(color=color, dash=dash, width=width), **kw)
 
 
 def limit_lines(fig, limit: float, row=None, col=None, label=True):
+    P = pal()
     hline(fig, limit, P.limit, "dash", 1.2, f"+{limit:g}" if label else None, "top right", row, col)
     hline(fig, -limit, P.limit, "dash", 1.2, f"−{limit:g}" if label else None, "bottom right", row, col)
+
+
+def event_marks(fig, xs, titles, highlight=None, rows=None, max_chars: int = 22, x_ref: str = "x") -> None:
+    """Dashed vertical lines for logged interventions, each with a short label
+    above the plot area. Neighbouring labels alternate between two heights so
+    they do not run into each other; hovering a label shows the full title."""
+    P = pal()
+    items = sorted(zip(list(xs), [str(t) for t in titles]), key=lambda it: it[0])
+    for i, (x, title) in enumerate(items):
+        hl = highlight is not None and x == highlight
+        line = dict(color=P.event, width=2.5 if hl else 1.3, dash="solid" if hl else "dash")
+        if rows:
+            for r in rows:
+                fig.add_vline(x=x, line=line, row=r, col=1)
+        else:
+            fig.add_vline(x=x, line=line)
+        text = f"◆ {short(title, max_chars)}"
+        fig.add_annotation(x=x, xref=x_ref, y=1.0, yref="paper", yanchor="bottom", xanchor="left", xshift=-4,
+                           yshift=14 * (i % 2), showarrow=False, text=f"<b>{text}</b>" if hl else text,
+                           hovertext=title, font=dict(size=10, color=P.ink["secondary"]),
+                           bgcolor=rgba(P.ink["surface"], 0.85))
+
+
+def thin_ticks(fig, labels, max_ticks: int = 8, row=None, col=None) -> None:
+    """Show every k-th category label, horizontally, so they never overlap."""
+    labels = list(labels)
+    if not labels:
+        return
+    k = max(1, math.ceil(len(labels) / max_ticks))
+    kw = {"row": row, "col": col} if row is not None else {}
+    fig.update_xaxes(tickmode="array", tickvals=labels[::k], ticktext=labels[::k], tickangle=0, **kw)
 
 
 def short(s: str, n: int) -> str:
@@ -232,6 +283,7 @@ def sparkline_svg(values, width: int = 120, height: int = 32, color: str | None 
             v.append(fx)
     if len(v) < 2:
         return ""
+    P = pal()
     color = color or P.accent
     lo = min(v + ([target] if target is not None else []))
     hi = max(v + ([target] if target is not None else []))

@@ -20,12 +20,13 @@ def transition_heatmap(tr: pd.DataFrame, title: str | None = None, height: int =
     rows = z.sum(axis=1, keepdims=True)
     pct = z / np.where(rows == 0, 1, rows) * 100
     text = [[f"<b>{int(v)}</b> · {p:.0f}%" for v, p in zip(row, prow)] for row, prow in zip(z, pct)]
-    fig = go.Figure(go.Heatmap(z=pct, x=[f"→ {c}" for c in tr.columns], y=[f"{r} at run 1" for r in tr.index],
-                               text=text, texttemplate="%{text}", colorscale=P.seq_light, zmin=0, zmax=100,
-                               showscale=False, xgap=3, ygap=3,
-                               hovertemplate="%{y} %{x}: %{z:.0f}% of the row<extra></extra>"))
-    fig.update_yaxes(autorange="reversed")
-    fig.update_xaxes(title_text="Status at the next run")
+    short = {"INCOMPLETE": "INCOMPL."}
+    fig = go.Figure(go.Heatmap(z=pct, x=[short.get(c, c) for c in tr.columns], y=[short.get(r, r) for r in tr.index],
+                               text=text, texttemplate="%{text}", textfont=dict(size=13), colorscale=P.seq_light,
+                               zmin=0, zmax=100, showscale=False, xgap=3, ygap=3,
+                               hovertemplate="run 1 %{y} → next run %{x}: %{z:.0f}% of the row<extra></extra>"))
+    fig.update_yaxes(autorange="reversed", title_text="Status at run 1")
+    fig.update_xaxes(title_text="Status at the next run", tickangle=0, side="bottom")
     return T.style(fig, height=height, title=title, legend=False)
 
 
@@ -40,8 +41,8 @@ def grr_bars(rep: pd.DataFrame, title: str | None = None, height: int = 340) -> 
                              customdata=np.stack([s["SigmaRepeat"], s["N"]], axis=1),
                              hovertemplate="<b>%{x}</b> · " + t + "<br>%GRR %{y:.1f}%<br>σ repeat %{customdata[0]:.3f} mm"
                                            " (n=%{customdata[1]})<extra></extra>"))
-    T.hline(fig, 10, P.target, "dot", 1.5, "10% good", "top left")
-    T.hline(fig, 30, P.limit, "dash", 1.5, "30% not acceptable", "top left")
+    T.hline(fig, 10, P.target, "dot", 1.5, "10% good", "top right")
+    T.hline(fig, 30, P.limit, "dash", 1.5, "30% not acceptable", "top right")
     fig.update_layout(barmode="group", bargap=0.3, bargroupgap=0.08)
     fig.update_yaxes(title_text="%GRR (6σ / tolerance)", ticksuffix="%", rangemode="tozero",
                      range=[0, max(35.0, float(rep["GRR"].max()) * 1.15)])
@@ -78,7 +79,7 @@ def gap_hist(pairs: pd.DataFrame, max_gap: float, title: str | None = None, heig
                                  hovertemplate="%{x} min: %{y} pairs<extra></extra>"))
     fig.add_vline(x=max_gap, line=dict(color=P.ink["primary"], dash="dash"),
                   annotation_text=f"{max_gap:.0f} min", annotation_font=dict(size=10, color=P.ink["secondary"]))
-    fig.update_xaxes(title_text="Minutes between the two runs (capped at 24 h)")
+    fig.update_xaxes(title_text="Minutes between runs (cap 24 h)")
     fig.update_yaxes(title_text="Pairs")
     return T.style(fig, height=height, title=title, legend=False)
 
@@ -100,7 +101,7 @@ def z_surface(surf: dict, bat_type: str, title: str | None = None, height: int =
     magnify = 1.0
     fig = go.Figure()
     fig.add_trace(go.Surface(x=X, y=Y, z=Z, colorscale=P.diverging, cmin=-zabs, cmax=zabs,
-                             colorbar=dict(title="Z (mm)", len=0.6), opacity=0.95,
+                             colorbar=dict(title="Z (mm)", len=0.55, thickness=12), opacity=0.95,
                              hovertemplate="X %{x:.0f} · Y %{y:.0f}<br>Z %{z:+.3f} mm<extra></extra>"))
     cx = [nom[c][0] for c in CORNERS]
     cy = [nom[c][1] for c in CORNERS]
@@ -117,9 +118,9 @@ def z_surface(surf: dict, bat_type: str, title: str | None = None, height: int =
     fig.update_layout(scene=dict(
         xaxis_title="X (front →)", yaxis_title="Y", zaxis_title="Z (mm)",
         zaxis=dict(range=[-zabs * 1.2, zabs * 1.2]),
-        yaxis=dict(autorange="reversed"), aspectmode="manual", aspectratio=dict(x=1.6, y=1.0, z=0.5),
-        camera=dict(eye=dict(x=-1.35, y=-1.6, z=0.9))))
-    return T.style(fig, height=height, title=title, margin=dict(t=30))
+        yaxis=dict(autorange="reversed"), aspectmode="manual", aspectratio=dict(x=1.5, y=1.0, z=0.45),
+        camera=dict(eye=dict(x=-1.8, y=-2.0, z=1.05), center=dict(x=0, y=0, z=-0.08))))
+    return T.style(fig, height=height, title=title, legend_bottom=True, margin=dict(t=10, l=0, r=0))
 
 
 def z_box(first: pd.DataFrame, z_lim: tuple[float, float], title: str | None = None, height: int = 320) -> go.Figure:
@@ -155,5 +156,9 @@ def z_trends(first: pd.DataFrame, title: str | None = None, height: int = 430) -
                                      marker=dict(size=7, color=P.type(t)),
                                      error_y=dict(type="data", array=w["std"], color=T.rgba(P.type(t), 0.4), thickness=1),
                                      hovertemplate="%{x}: %{y:+.3f}<extra>" + t + "</extra>"), row=r, col=c)
-        fig.update_xaxes(type="category", row=r, col=c)
+    weeks = first.drop_duplicates("WeekKey").sort_values("WeekKey")["CalendarWeek"].tolist()
+    for i in range(4):
+        r, c = i // 2 + 1, i % 2 + 1
+        fig.update_xaxes(type="category", categoryorder="array", categoryarray=weeks, row=r, col=c)
+        T.thin_ticks(fig, weeks, max_ticks=6, row=r, col=c)
     return T.style(fig, height=height, title=title, legend_bottom=True)

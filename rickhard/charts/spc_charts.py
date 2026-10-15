@@ -16,8 +16,7 @@ def imr_chart(cc: ControlChart, x, labels: list[str] | None, name: str, unit: st
               height: int = 560) -> go.Figure:
     """Individuals (top) and moving range (bottom) with σ zones and run-rule signals."""
     P = T.pal()
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.72, 0.28], vertical_spacing=0.06,
-                        subplot_titles=(f"{name} — individuals", "Moving range"))
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.72, 0.28], vertical_spacing=0.05)
     s = float(cc.sigma[0])
     c = cc.center
     for k, alpha in ((3, 0.05), (2, 0.07), (1, 0.09)):
@@ -52,10 +51,9 @@ def imr_chart(cc: ControlChart, x, labels: list[str] | None, name: str, unit: st
         if cc.mr_ucl and np.isfinite(cc.mr_ucl):
             T.hline(fig, cc.mr_ucl, P.limit, "dash", 1.2, f"UCL {cc.mr_ucl:.3f}", "top left", row=2, col=1)
     if events is not None and len(events):
-        for _, e in events.iterrows():
-            fig.add_vline(x=e["Date"], line=dict(color=P.event, width=1.5, dash="dash"), row=1, col=1)
-    fig.update_yaxes(title_text=unit, row=1, col=1)
-    fig.update_yaxes(title_text=unit, row=2, col=1, rangemode="tozero")
+        T.event_marks(fig, pd.to_datetime(events["Date"]), events["Title"], rows=[1, 2])
+    fig.update_yaxes(title_text=f"{name} ({unit})", row=1, col=1)
+    fig.update_yaxes(title_text=f"Moving range ({unit})", row=2, col=1, rangemode="tozero")
     return T.style(fig, height=height, title=title, legend_bottom=True)
 
 

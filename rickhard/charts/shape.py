@@ -22,14 +22,16 @@ def squareness_status(sq: pd.DataFrame, title: str | None = None, height: int = 
     pct = t.div(tot, axis=0) * 100
     fig = go.Figure()
     for s, label in (("SQUARE OK", "Square"), ("DEFORMED", "Deformed")):
+        last = s == "DEFORMED"  # thin last segment: label outside the bar
         fig.add_trace(go.Bar(
             y=pct.index, x=pct[s], orientation="h", name=label, marker_color=P.status(s),
             marker_line=dict(width=1.5, color=P.ink["surface"]),
-            text=[f"{p:.1f}%" if p >= 6 else "" for p in pct[s]], textposition="inside", insidetextanchor="middle",
-            textfont=dict(color="#ffffff"), customdata=np.stack([t[s], tot], axis=1),
+            text=[f"{p:.1f}%" if (last or p >= 12) else "" for p in pct[s]],
+            textposition="outside" if last else "inside", textangle=0, cliponaxis=False, insidetextanchor="middle",
+            textfont=dict(color=P.status(s) if last else "#ffffff"), customdata=np.stack([t[s], tot], axis=1),
             hovertemplate=f"<b>%{{y}}</b><br>{label}: %{{x:.1f}}% (%{{customdata[0]}} of %{{customdata[1]}})<extra></extra>"))
     fig.update_layout(barmode="stack", bargap=0.45)
-    fig.update_xaxes(range=[0, 100], ticksuffix="%")
+    fig.update_xaxes(range=[0, 114], tickvals=[0, 25, 50, 75, 100], ticksuffix="%")
     fig.update_yaxes(autorange="reversed")
     return T.style(fig, height=height, title=title)
 
@@ -101,12 +103,13 @@ def fail_rate_by_band(by_band: pd.DataFrame, diag_tol: float, overall_fail: floa
         error_y=dict(type="data", symmetric=False, array=(d["CI_hi"] - d["FailRate"]).clip(lower=0),
                      arrayminus=(d["FailRate"] - d["CI_lo"]).clip(lower=0), color=P.ink["secondary"],
                      thickness=1.2, width=4),
-        text=[f"{v:.0f}% · n={n}" for v, n in zip(d["FailRate"], d["N"])],
-        textposition="outside", cliponaxis=False, customdata=d["N"],
+        customdata=d["N"],
         hovertemplate="ΔDiag %{x} mm<br>NOK rate %{y:.1f}% (n=%{customdata})<extra></extra>", showlegend=False))
     if overall_fail is not None:
-        T.hline(fig, overall_fail, P.ink["secondary"], "dot", 1.2, f"overall {overall_fail:.1f}%", "top right")
-    fig.update_xaxes(title_text=f"Diagonal delta band (mm) — red: above the {diag_tol:g} mm limit", type="category")
+        T.hline(fig, overall_fail, P.ink["secondary"], "dot", 1.2, f"overall {overall_fail:.1f}%", "top left")
+    fig.update_xaxes(title_text=f"Diagonal delta (mm) · red = above {diag_tol:g} mm", type="category",
+                     tickmode="array", tickvals=list(d["Label"]),
+                     ticktext=[f"{lab}<br><span style='font-size:10px'>n={n}</span>" for lab, n in zip(d["Label"], d["N"])])
     fig.update_yaxes(title_text="NOK rate", ticksuffix="%",
                      range=[0, max(10.0, float(d["CI_hi"].max()) * 1.25)])
     fig.update_layout(bargap=0.35)

@@ -6,7 +6,7 @@ Run with:  streamlit run streamlit_app.py
 import streamlit as st
 
 st.set_page_config(page_title="RICKHARD X · ST020 corner intelligence", page_icon=":material/crop_free:",
-                   layout="wide", initial_sidebar_state="expanded")
+                   layout="wide", initial_sidebar_state="auto")
 
 from app import data, sidebar, state, ui  # noqa: E402  (page config must come first)
 from rickhard.charts import theme  # noqa: E402

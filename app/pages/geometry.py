@@ -54,7 +54,7 @@ with tab1:
         i0, i1 = 0, 0
     plot_df = base.iloc[int(i0): int(i1) + 1]
     if len(plot_df):
-        st.caption(f"{len(plot_df)} modules · {plot_df['Date'].min():%Y-%m-%d %H:%M} – {plot_df['Date'].max():%Y-%m-%d %H:%M}")
+        st.caption(f"{ui.plural(len(plot_df), 'module')} · {plot_df['Date'].min():%Y-%m-%d %H:%M} – {plot_df['Date'].max():%Y-%m-%d %H:%M}")
     focus = state.focus()
     if focus and focus in set(base["_mod_key"]) and focus not in set(plot_df["_mod_key"]):
         plot_df = pd.concat([plot_df, base[base["_mod_key"] == focus]])

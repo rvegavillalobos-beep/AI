@@ -45,7 +45,9 @@ with right:
         {"label": "FPY today", "value": ui.fmt_pct(today), "sub": f"{len(a.first):,} modules"},
         {"label": "FPY in this scenario", "value": ui.fmt_pct(scen), "delta": f"{scen - today:+.1f} pp",
          "good": scen >= today},
-        {"label": f"Gap to the {r.fpy_target:g}% target", "value": f"{scen - r.fpy_target:+.1f} pp",
+        {"label": (f"Above the {r.fpy_target:g}% target" if scen >= r.fpy_target
+                   else f"Still missing to the {r.fpy_target:g}% target"),
+         "value": f"{abs(scen - r.fpy_target):.1f} pp",
          "good": scen >= r.fpy_target, "accent": "#0ca30c" if scen >= r.fpy_target else "#d03b3b"},
     ])
     ui.chart(ccmp.waterfall(wf, r.fpy_target), "tg_wf")

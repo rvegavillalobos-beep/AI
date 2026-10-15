@@ -156,21 +156,21 @@ def drift_movie(first: pd.DataFrame, nominals: Nominals, bat_type: str, limit: f
     ys_all = [nom[c][1] for c in CORNERS]
     pad = (limit + 1.5) * k
     fig.update_layout(
-        updatemenus=[dict(type="buttons", showactive=False, x=0, y=-0.08, xanchor="left", yanchor="top",
+        updatemenus=[dict(type="buttons", showactive=False, x=0, y=-0.12, xanchor="left", yanchor="top",
                           direction="right", pad=dict(t=0, r=10),
                           buttons=[dict(label="▶ Play", method="animate",
                                         args=[None, dict(frame=dict(duration=700, redraw=True), fromcurrent=True,
                                                          transition=dict(duration=300))]),
                                    dict(label="❚❚ Pause", method="animate",
                                         args=[[None], dict(frame=dict(duration=0, redraw=False), mode="immediate")])])],
-        sliders=[dict(active=0, steps=steps, x=0.16, y=-0.06, len=0.84, xanchor="left", yanchor="top",
-                      currentvalue=dict(prefix="Week ", font=dict(size=12)), pad=dict(t=8))],
+        sliders=[dict(active=0, steps=steps, x=0, y=-0.21, len=1.0, xanchor="left", yanchor="top",
+                      currentvalue=dict(visible=False), pad=dict(t=4, b=4))],
         annotations=list(frames[0].layout.annotations),
     )
     fig.update_xaxes(range=[min(xs_all) - pad, max(xs_all) + pad], title_text="Global X (mm) — front →")
     fig.update_yaxes(range=[max(ys_all) + pad, min(ys_all) - pad], scaleanchor="x", scaleratio=1,
                      title_text="Global Y (mm)")
-    return T.style(fig, height=height, title=title, margin=dict(b=96))
+    return T.style(fig, height=height, title=title, margin=dict(b=150))
 
 
 def correction_map(first: pd.DataFrame, nominals: Nominals, bat_type: str, limit: float,

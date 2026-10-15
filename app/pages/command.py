@@ -29,7 +29,7 @@ if "last_week" in k:
     diff = k["last_week_fpy"] - k.get("prev_fpy", np.nan)
     cards.append({"label": f"Latest week · {k['last_week']}", "value": ui.fmt_pct(k["last_week_fpy"]),
                   "delta": f"{diff:+.1f} pp vs the 4 weeks before" if np.isfinite(diff) else None,
-                  "good": bool(diff >= 0) if np.isfinite(diff) else None, "sub": f"{k['last_week_n']} modules"})
+                  "good": bool(diff >= 0) if np.isfinite(diff) else None, "sub": ui.plural(int(k['last_week_n']), "module")})
 cards.append({"label": "Modules (first run)", "value": f"{n:,}",
               "sub": f"{k['runs']:,} runs · {k['remeasured']:,} re-measured"})
 nok = k["fail"] + (0 if r.incomplete_as_fail else k["incomplete"])
@@ -77,6 +77,8 @@ with col2:
     ui.section("Where on the module", "Bubble size: share of modules out of tolerance at each corner. Arrow: the "
                                       "corner's mean error, magnified.")
     ui.chart(co.hotspot_map(a.first, r.spec_limit, c.nominals, c.types), "cc_hot")
+    st.caption("Bubble: share of modules out of tolerance at that corner · arrow: the corner's mean error ×150 · "
+               "front of the module to the right.")
 
 col3, col4 = st.columns([3, 2], gap="large")
 with col3:

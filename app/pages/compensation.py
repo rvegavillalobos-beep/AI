@@ -138,7 +138,7 @@ left, right = st.columns([3, 2], gap="large")
 with left:
     ui.section("Work instruction for the line", "Where each corner must move, magnified. The arrows are the "
                                                 "equivalent per-corner offsets of the rigid correction.")
-    ui.svg_box(svg.work_instruction_svg(t, dx, dy, yaw, nom))
+    ui.svg_box(svg.work_instruction_svg(t, dx, dy, yaw, nom), "Work instruction: where each corner must move")
 with right:
     ui.section("Equivalent corner offsets")
     st.dataframe(comp.equivalent_offsets_table({t: (dx, dy, yaw)}, nom), hide_index=True, width="stretch",
@@ -146,11 +146,10 @@ with right:
                                 "Offset Y [mm]": cfg.NumberColumn(format="%+.3f")})
     st.caption("Convention: positive X moves the module towards the front, positive Y towards the right side, "
                "positive yaw turns +X towards +Y. Check the sign convention of your conveyor before applying.")
-    b1, b2 = st.columns(2)
-    if b1.button("Use in Path to Target", icon=":material/flag:", width="stretch"):
+    if st.button("Use in Path to Target", icon=":material/flag:", width="stretch"):
         data.set_chosen_compensation(t, (dx, dy, yaw), applied_m)
         st.toast(f"{t}: {applied_m} correction will be used in Path to Target.", icon=":material/check:")
-    if b2.button("Log as intervention", icon=":material/event_note:", width="stretch",
+    if st.button("Log as intervention", icon=":material/event_note:", width="stretch",
                  help="Adds an entry to the Interventions log at the end of the data, so you can measure the effect "
                       "once new data arrives."):
         state.add_event({"Date": pd.Timestamp(a.first["Date"].max()).isoformat(), "Scope": t, "Category": "Adjustment",

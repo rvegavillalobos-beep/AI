@@ -1,11 +1,14 @@
 """Hand-built SVG: the compensation work instruction and the app logo.
 
-Arrowheads are drawn as polygons (no <marker> elements) so the SVG survives
-HTML sanitisers unchanged.
+Arrowheads are drawn as polygons (no <marker> elements). HTML sanitisers
+(Streamlit's ``st.html`` among them) drop inline ``<svg>``, so pages embed
+these drawings as images with :func:`as_img`.
 """
 
 from __future__ import annotations
 
+import base64
+import html
 import math
 
 import numpy as np
@@ -14,6 +17,15 @@ from ..config import Nominals
 from ..constants import CORNERS
 from ..geometry import rel_nominal, rigid_transform
 from . import theme as T
+
+
+def as_img(svg: str, alt: str = "", style: str = "") -> str:
+    """An ``<img>`` showing the SVG from a data URI."""
+    if not svg:
+        return ""
+    b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    return (f'<img src="data:image/svg+xml;base64,{b64}" alt="{html.escape(alt, quote=True)}" '
+            f'style="{html.escape(style, quote=True)}">')
 
 
 def _arrow(x1, y1, x2, y2, color, width=2.5, head=9.0) -> str:
@@ -52,8 +64,8 @@ def work_instruction_svg(bat_type: str, dx: float, dy: float, yaw: float, nomina
     k = magnify
     new_pts = " ".join("{:.1f},{:.1f}".format(*to_px(rx[i] + k * ox[i], ry[i] + k * oy[i])) for i in order)
     parts = [
-        f'<svg viewBox="0 0 {width} {height}" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" '
-        f'aria-label="Compensation work instruction" style="max-width:{width}px;font-family:{T.FONT}">',
+        f'<svg viewBox="0 0 {width} {height}" width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" '
+        f'role="img" aria-label="Compensation work instruction" font-family="{T.FONT}">',
         f'<polygon points="{nom_pts}" fill="{T.rgba(muted, 0.06)}" stroke="{muted}" stroke-width="1.5" '
         f'stroke-dasharray="6 5"/>',
         f'<polygon points="{new_pts}" fill="{T.rgba(acc, 0.08)}" stroke="{acc}" stroke-width="2.5"/>',

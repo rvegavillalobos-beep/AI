@@ -55,12 +55,9 @@ def weekly_fpy(weekly: pd.DataFrame, target: float, ma_window: int, show_incompl
     fig.update_layout(barmode="stack", bargap=0.35)
     fig.update_yaxes(title_text="Modules", row=2, col=1, rangemode="tozero")
     if events is not None and len(events) and "CalendarWeek" in events:
-        for _, e in events.iterrows():
-            if e["CalendarWeek"] in x:
-                fig.add_vline(x=e["CalendarWeek"], line=dict(color=P.event, width=1.2, dash="dot"))
-                fig.add_annotation(x=e["CalendarWeek"], y=1.0, yref="paper", text="◆ " + T.short(e["Title"], 24),
-                                   showarrow=False, xanchor="left", yanchor="bottom",
-                                   font=dict(size=10, color=P.ink["secondary"]))
+        ev = events[events["CalendarWeek"].isin(x)]
+        if len(ev):
+            T.event_marks(fig, ev["CalendarWeek"], ev["Title"], rows=[1, 2], max_chars=20)
     if low.any():
         fig.add_annotation(x=1, y=-0.02, xref="paper", yref="paper", xanchor="right", yanchor="top",
                            text="hollow points: weeks with fewer than 5 modules", showarrow=False,
@@ -85,15 +82,18 @@ def status_by_type(first: pd.DataFrame, title: str | None = None, height: int = 
     for s, label in (("PASS", "OK"), ("INCOMPLETE", "Incomplete"), ("FAIL", "NOK")):
         if t[s].sum() == 0 and s == "INCOMPLETE":
             continue
+        last = s == "FAIL"  # the last segment: its label goes outside the bar, readable however thin it is
         fig.add_trace(go.Bar(
             y=pct.index, x=pct[s], orientation="h", name=label, marker_color=P.status(s),
             marker_line=dict(width=1.5, color=P.ink["surface"]),
-            text=[f"{p:.1f}%" if p >= 7 else "" for p in pct[s]], textposition="inside",
-            insidetextanchor="middle", textfont=dict(color="#ffffff", size=12),
+            text=[f"{p:.1f}%" if (last or p >= 12) else "" for p in pct[s]],
+            textposition="outside" if last else "inside", textangle=0, cliponaxis=False,
+            insidetextanchor="middle",
+            textfont=dict(color=P.status(s) if last else "#ffffff", size=12),
             customdata=np.stack([t[s], tot], axis=1),
             hovertemplate=f"<b>%{{y}}</b><br>{label}: %{{x:.1f}}% (%{{customdata[0]}} of %{{customdata[1]}})<extra></extra>"))
     fig.update_layout(barmode="stack", bargap=0.45)
-    fig.update_xaxes(range=[0, 100], ticksuffix="%", title_text="Share of first runs")
+    fig.update_xaxes(range=[0, 114], tickvals=[0, 25, 50, 75, 100], ticksuffix="%", title_text="Share of first runs")
     fig.update_yaxes(autorange="reversed")
     return T.style(fig, height=height, title=title)
 
@@ -189,7 +189,7 @@ def hotspot_map(first: pd.DataFrame, limit: float, nominals: Nominals, types: li
                                showarrow=True, arrowhead=2, arrowsize=1.2, arrowwidth=2,
                                arrowcolor=P.ink["secondary"], text="")
         fig.add_trace(go.Scatter(
-            x=cx, y=cy, mode="markers+text", text=labels,
+            x=cx, y=cy, mode="markers+text", text=labels, cliponaxis=False,
             textposition=["top right", "bottom right", "top left", "bottom left"],  # FL, FR, RL, RR on screen
             textfont=dict(size=12),
             marker=dict(size=sizes, color=[T.rgba(P.status("FAIL"), 0.15 + 0.6 * r / rmax) for r in rates],
@@ -198,9 +198,5 @@ def hotspot_map(first: pd.DataFrame, limit: float, nominals: Nominals, types: li
         fig.update_yaxes(autorange="reversed", scaleanchor=xref, scaleratio=1,
                          showgrid=False, zeroline=False, showticklabels=False, row=1, col=k)
         fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False, row=1, col=k,
-                         range=[min(xs) - 420, max(xs) + 420])
-    fig.add_annotation(x=0.5, y=-0.06, xref="paper", yref="paper", showarrow=False,
-                       text=f"Bubble = share of modules out of tolerance at that corner · arrow = mean error ×{exaggeration:g}"
-                            " · front of the module to the right",
-                       font=dict(size=10, color=P.ink["muted"]))
-    return T.style(fig, height=height, title=title, legend=False, margin=dict(b=30))
+                         range=[min(xs) - 650, max(xs) + 650])
+    return T.style(fig, height=height, title=title, legend=False, margin=dict(b=8))

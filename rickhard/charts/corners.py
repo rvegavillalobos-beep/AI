@@ -154,10 +154,10 @@ def capability_grid(cap: pd.DataFrame, title: str | None = None, height: int = 3
         textfont=dict(color="#111111", size=12)))
     fig.update_yaxes(autorange="reversed")
     fig.update_xaxes(side="top")
-    fig.add_annotation(x=0.5, y=-0.06, xref="paper", yref="paper", showarrow=False,
-                       text="Ppk < 0.67 critical · < 1.00 poor · < 1.33 marginal · ≥ 1.33 capable",
+    fig.add_annotation(x=0.5, y=0, yshift=-8, xref="paper", yref="paper", showarrow=False, yanchor="top",
+                       text="Ppk < 0.67 critical · < 1.00 poor<br>< 1.33 marginal · ≥ 1.33 capable",
                        font=dict(size=10, color=P.ink["muted"]))
-    return T.style(fig, height=height, title=title, legend=False, margin=dict(b=30, t=30))
+    return T.style(fig, height=height, title=title, legend=False, margin=dict(b=44, t=30))
 
 
 def capability_hist(values, lo: float, hi: float, name: str, stats: dict | None = None,

@@ -36,8 +36,9 @@ def uploader(key: str, label: str = "Measurement export(s) — Excel or CSV") ->
 
 
 def brand() -> None:
-    st.sidebar.html(f"<div style='display:flex;gap:10px;align-items:center;margin:-.4rem 0 .2rem 0'>"
-                    f"{svg.logo_svg(34)}<div><div style='font-weight:750;font-size:1.05rem;line-height:1.1'>RICKHARD X</div>"
+    logo = svg.as_img(svg.logo_svg(34), "RICKHARD X", "width:34px;height:34px;flex:0 0 34px")
+    st.sidebar.html(f"<div style='display:flex;gap:10px;align-items:center;margin:-.4rem 0 .2rem 0'>{logo}"
+                    f"<div><div style='font-weight:750;font-size:1.05rem;line-height:1.1'>RICKHARD X</div>"
                     f"<div style='font-size:.74rem;opacity:.65'>ST020 corner intelligence · v{__version__}</div></div></div>")
 
 

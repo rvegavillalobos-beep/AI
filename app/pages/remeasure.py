@@ -23,7 +23,7 @@ ui.kpi_cards([
     {"label": "Modules re-measured", "value": f"{summ.get('modules_remeasured', 0):,}", "sub": f"{summ.get('pairs', 0):,} run pairs"},
     {"label": "NOK at run 1 re-measured", "value": f"{summ.get('nok_remeasured', 0):,}"},
     {"label": "NOK → OK at the next run", "value": ui.fmt_pct(summ.get("nok_to_ok_rate", np.nan)),
-     "sub": f"{summ.get('nok_to_ok', 0)} modules"},
+     "sub": ui.plural(int(summ.get('nok_to_ok', 0)), "module")},
     {"label": "Repeatability σ (median)", "value": ui.fmt_mm(summ.get("median_sigma", np.nan), 3, signed=False),
      "sub": f"from pairs ≤ {gap:.0f} min apart"},
     {"label": "%GRR (worst)", "value": ui.fmt_pct(summ.get("max_grr", np.nan), 0), "sub": summ.get("worst_coord", ""),

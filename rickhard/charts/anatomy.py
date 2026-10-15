@@ -24,7 +24,7 @@ def budget_bars(bud: pd.DataFrame, bat_type: str, title: str | None = None, heig
     labels = [MODE_LABELS[m] for m in b["Mode"]]
     colors = [P.family(MODE_FAMILY[m]) for m in b["Mode"]]
     fig = make_subplots(rows=1, cols=2, shared_yaxes=True, horizontal_spacing=0.05,
-                        subplot_titles=("Systematic — mean error (mm)", "Random — module-to-module σ (mm)"))
+                        subplot_titles=("Systematic: mean (mm)", "Random: σ (mm)"))
     fig.add_trace(go.Bar(
         y=labels, x=b["Bias"], orientation="h", marker_color=colors, showlegend=False, cliponaxis=False,
         text=[f"{v:+.2f} ({s:.0f}%)" for v, s in zip(b["Bias"], b["BiasShare"])], textposition="outside",
@@ -128,7 +128,8 @@ def pca_components(p: dict, bat_type: str, nominals: Nominals, magnify: float = 
     comps = p["components"]
     nom = nominals.get(bat_type)
     nx, ny = polygon(nom)
-    titles = [f"<b>PC{c['k']} · {c['share']:.0f}%</b><br><span style='font-size:11px'>{c['label']}</span>" for c in comps]
+    titles = [f"<b>PC{c['k']} · {c['share']:.0f}%</b><br><span style='font-size:11px'>"
+              f"{c['label'].replace(' + ', '<br>')}</span>" for c in comps]
     fig = make_subplots(rows=1, cols=len(comps), subplot_titles=titles, horizontal_spacing=0.03)
     for i, c in enumerate(comps, start=1):
         fig.add_trace(go.Scatter(x=nx, y=ny, mode="lines", line=dict(color=P.ink["muted"], width=1.2, dash="dash"),
@@ -145,7 +146,7 @@ def pca_components(p: dict, bat_type: str, nominals: Nominals, magnify: float = 
                          row=1, col=i)
     for a in fig.layout.annotations:
         a.font = dict(size=12)
-    return T.style(fig, height=height, title=title, legend=False, margin=dict(t=72))
+    return T.style(fig, height=height, title=title, legend=False, margin=dict(t=84))
 
 
 def mode_link(link: pd.DataFrame, bat_type: str, title: str | None = None, height: int = 340) -> go.Figure:

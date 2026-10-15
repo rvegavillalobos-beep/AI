@@ -1,4 +1,5 @@
 import dataclasses
+import datetime
 
 import pandas as pd
 import streamlit as st
@@ -27,41 +28,55 @@ ui.kpi_cards([
      "sub": "treated as missing" if h["zero_as_missing"] else "used as measurements"},
 ])
 
+def _time_format_example(fmt: str) -> str:
+    if fmt and "%" in fmt:
+        return f"`{datetime.datetime(2026, 8, 19, 19, 16, 5).strftime(fmt)}`"
+    return fmt or "–"
+
+
 notes = []
 if h.get("duplicate_rows_removed"):
-    notes.append(("warn", f"**{h['duplicate_rows_removed']} exact duplicate row(s)** were dropped (repeated rows or "
-                          "overlapping exports). Left in, a duplicated corner looks like the start of a fake re-measurement."))
+    notes.append(("warn", "Duplicate rows",
+                  f"**{h['duplicate_rows_removed']} exact duplicate row(s)** were dropped (repeated rows or overlapping "
+                  "exports). Left in, a duplicated corner looks like the start of a fake re-measurement."))
 for pair in h.get("similar_part_ids", []):
     merged = h.get("lookalike_ids_merged", 0) > 0
-    notes.append(("info" if merged else "warn",
+    notes.append(("info" if merged else "warn", "Look-alike Part IDs",
                   f"Part IDs **{pair[0]}** and **{pair[1]}** differ only by letter O vs digit 0. "
                   + ("They are merged." if merged else "They are counted as two modules — merge them below.")))
 if h.get("zero_readings"):
-    notes.append(("warn", f"**{h['zero_readings']} reading(s) with X, Y (and Z) all exactly 0** — almost certainly "
-                          "failed reads. " + ("Treated as missing corners." if h["zero_as_missing"]
-                                              else "Currently used as real measurements.")))
+    notes.append(("warn", "Failed reads",
+                  f"**{h['zero_readings']} reading(s) with X, Y (and Z) all exactly 0** — almost certainly failed reads. "
+                  + ("Treated as missing corners." if h["zero_as_missing"] else "Currently used as real measurements.")))
 if h.get("dst_ambiguous_rows") or h.get("dst_nonexistent_rows"):
-    notes.append(("info", f"Daylight-saving change in the export time zone: {h['dst_ambiguous_rows']} row(s) in the "
-                          f"repeated autumn hour (read as summer time), {h['dst_nonexistent_rows']} in the skipped "
-                          "spring hour (moved forward). None were dropped."))
+    notes.append(("info", "Daylight-saving change",
+                  f"{h['dst_ambiguous_rows']} row(s) in the repeated autumn hour (read as summer time), "
+                  f"{h['dst_nonexistent_rows']} in the skipped spring hour (moved forward). None were dropped."))
 if h.get("rows_without_valid_time"):
     ex = ", ".join(f"`{x}`" for x in h.get("examples_bad_time", []))
-    notes.append(("bad", f"**{h['rows_without_valid_time']} row(s) without a readable time** were left out ({ex})."))
+    notes.append(("bad", "Unreadable times",
+                  f"**{h['rows_without_valid_time']} row(s) without a readable time** were left out ({ex})."))
 if h.get("rows_unmapped_feature"):
     feats = ", ".join(f"`{f}` ({n})" for f, n in h.get("unmapped_features", {}).items())
-    notes.append(("warn", f"**{h['rows_unmapped_feature']} row(s)** have a feature that is not one of the four corners "
-                          f"and were ignored: {feats}. Map them below if they are corners."))
+    notes.append(("warn", "Features that are not corners",
+                  f"**{h['rows_unmapped_feature']} row(s)** have a feature that is not one of the four corners and were "
+                  f"ignored: {feats}. Map them below if they are corners."))
 if h.get("non_numeric_deviation_values"):
-    notes.append(("warn", f"{h['non_numeric_deviation_values']} deviation value(s) were not numbers and count as missing."))
+    notes.append(("warn", "Values that are not numbers",
+                  f"{h['non_numeric_deviation_values']} deviation value(s) were not numbers and count as missing."))
 if h.get("corner_measured_twice_in_a_run"):
-    notes.append(("info", f"{h['corner_measured_twice_in_a_run']} time(s) a corner appeared twice within one run; "
-                          "the last value was used."))
+    notes.append(("info", "Corner measured twice in a run",
+                  f"{h['corner_measured_twice_in_a_run']} time(s) a corner appeared twice within one run; the last "
+                  "value was used."))
 if ds.limits:
     txt = " · ".join(f"{ax} {lo:+g} / {hi:+g} mm" for ax, (lo, hi) in ds.limits.items())
-    notes.append(("info", f"Limits found in the export: {txt}. The X/Y tolerance in the sidebar is ±{r.spec_limit:g} mm."))
+    notes.append(("info", "Limits in the export",
+                  f"{txt}. The X/Y tolerance in the sidebar is ±{r.spec_limit:g} mm."))
 opts = state.load_options()
-notes.append(("info", f"Times are read as **{opts.source_tz}** and shown in **{opts.display_tz}**; calendar weeks are "
-                      f"ISO weeks of the shown time. Time format detected: {', '.join(h.get('time_formats', [])) or '–'}."))
+formats = ", ".join(_time_format_example(f) for f in h.get("time_formats", [])) or "–"
+notes.append(("info", "Times",
+              f"Read as **{opts.source_tz}** and shown in **{opts.display_tz}**; calendar weeks are ISO weeks of the "
+              f"shown time. Format detected: {formats}."))
 
 
 class _N:
@@ -70,7 +85,7 @@ class _N:
 
 
 ui.section("Data-quality report")
-ui.insight_cards([_N(lv, {"warn": "Check", "bad": "Problem", "info": "Note", "good": "OK"}[lv], t) for lv, t in notes])
+ui.insight_cards([_N(lv, title, t) for lv, title, t in notes])
 
 with st.expander("Files", icon=":material/description:"):
     st.dataframe(pd.DataFrame([{k: v for k, v in f.items() if k != "columns"} for f in ds.files]), hide_index=True,
