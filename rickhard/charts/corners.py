@@ -168,15 +168,28 @@ def capability_hist(values, lo: float, hi: float, name: str, stats: dict | None 
     if len(v) < 3:
         return T.empty("Not enough values.")
     color = color or P.accent
-    nb = min(60, max(15, int(np.sqrt(len(v)) * 1.5)))
-    fig = go.Figure(go.Histogram(x=v, nbinsx=nb, name=name, marker_color=T.rgba(color, 0.55),
+    # explicit "nice" bins (0.1, 0.2, 0.25, 0.5 mm …): the normal fit is scaled to them and the
+    # headroom below is computed from them
+    span = float(v.max() - v.min()) or 1.0
+    raw = span / min(40, max(12, int(np.sqrt(len(v)))))
+    mag = 10.0 ** np.floor(np.log10(raw))
+    bw = mag * next(s for s in (1, 2, 2.5, 5, 10) if raw <= s * mag * 1.0001)
+    start = round(float(np.floor(v.min() / bw) * bw), 9)
+    if start > v.min():
+        start = round(start - bw, 9)
+    edges = np.round(start + bw * np.arange(int((v.max() - start) // bw) + 2), 9)
+    while edges[-1] <= v.max():      # the largest value must lie inside the last bin, not on its edge
+        edges = np.append(edges, round(float(edges[-1]) + bw, 9))
+    counts, edges = np.histogram(v, bins=edges)
+    # Plotly stops binning at `end`: half a bin of slack so float rounding never drops the last values
+    fig = go.Figure(go.Histogram(x=v, xbins=dict(start=float(edges[0]), end=float(edges[-1]) + bw / 2, size=bw),
+                                 name=name, marker_color=T.rgba(color, 0.55),
                                  marker_line=dict(width=1, color=P.ink["surface"]),
                                  hovertemplate="%{x}: %{y} modules<extra></extra>", showlegend=False))
     mu, sd = float(v.mean()), float(v.std(ddof=1))
     xs = np.linspace(min(v.min(), lo) - 0.5, max(v.max(), hi) + 0.5, 200)
-    _, edges = np.histogram(v, bins=nb)
-    bw = edges[1] - edges[0]
-    fig.add_trace(go.Scatter(x=xs, y=_st.norm.pdf(xs, mu, sd) * len(v) * bw, mode="lines", name="Normal fit",
+    curve = _st.norm.pdf(xs, mu, sd) * len(v) * bw if sd > 0 else np.zeros_like(xs)
+    fig.add_trace(go.Scatter(x=xs, y=curve, mode="lines", name="Normal fit",
                              line=dict(color=color, width=2), hoverinfo="skip", showlegend=False))
     for x, lab in ((lo, "LSL"), (hi, "USL")):
         fig.add_vline(x=x, line=dict(color=P.limit, width=1.5, dash="dash"),
@@ -191,7 +204,8 @@ def capability_hist(values, lo: float, hi: float, name: str, stats: dict | None 
         fig.add_annotation(x=0, y=1.0, xref="paper", yref="paper", xanchor="left", yanchor="bottom", showarrow=False,
                            text=txt, font=dict(size=11, color=P.ink["secondary"]))
     fig.update_xaxes(title_text=f"{name} (mm)")
-    fig.update_yaxes(title_text="Modules")
+    # headroom so the limit and mean labels at the top sit above the tallest bar
+    fig.update_yaxes(title_text="Modules", range=[0, max(float(counts.max()), float(np.nanmax(curve))) * 1.2 + 1])
     fig.update_layout(bargap=0.04)
     return T.style(fig, height=height, title=title, legend=False, margin=dict(t=56))
 

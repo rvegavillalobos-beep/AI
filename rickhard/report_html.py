@@ -76,7 +76,7 @@ def _build(a, insights, actions, events, comp_rows, title, offline, note) -> str
     ]
     bud = budget(f)
     for t in a.types:
-        figs.append((f"Error budget · {t}", ca.budget_bars(bud, t, height=380)))
+        figs.append((f"Error budget · {t}", ca.budget_bars(bud, t, height=400)))
     chart_html = ""
     for i, (h, fig, *fig_note) in enumerate(figs):
         cap = f"<div class='meta'>{html.escape(fig_note[0])}</div>" if fig_note else ""

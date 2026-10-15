@@ -40,18 +40,21 @@ ui.kpi_cards([
      "sub": "the part a fixed X / Y / yaw correction removes"},
 ])
 
-left, right = st.columns([3, 2], gap="large")
+ui.section("Error budget", "Left: the systematic part of each mode (the mean over modules) — a fixed correction "
+                           "removes it. Right: the random part (module-to-module σ) — only reducing variation "
+                           "removes it. Amplitudes are RMS mm at the four corners, so they add up as variances.")
+ui.chart(ca.budget_bars(bud, t, height=400), "an_budget")
+
+left, right = st.columns(2, gap="large")
 with left:
-    ui.section("Error budget", "Left: the systematic part of each mode (the mean over modules) — a fixed correction "
-                               "removes it. Right: the random part (module-to-module σ) — only reducing variation "
-                               "removes it. Amplitudes are RMS mm at the four corners, so they add up as variances.")
-    ui.chart(ca.budget_bars(bud, t), "an_budget")
-with right:
     ui.section("Data-driven modes (PCA)", "The directions in which this process actually varies, and which physical "
                                           "modes they are made of.")
-    ui.chart(ca.pca_components(imp.pca(a.first, t, c.nominals), t, c.nominals, title=None, height=300), "an_pca")
-    ui.section("Does the mode drive NOK?")
-    ui.chart(ca.mode_link(imp.mode_fail_link(a.first), t, height=300), "an_link")
+    ui.chart(ca.pca_components(imp.pca(a.first, t, c.nominals), t, c.nominals, title=None, height=340), "an_pca")
+with right:
+    ui.section("Does the mode drive NOK?", "NOK rate of the quarter of modules where a mode deviates least from "
+                                           "its average vs the quarter where it deviates most. A big gap means "
+                                           "that mode's variation pushes modules out.")
+    ui.chart(ca.mode_link(imp.mode_fail_link(a.first), t, height=340), "an_link")
 
 ui.section("What each mode does to the module", "Every mode drawn at |mean| + 2σ of this process, magnified.")
 state.init("p_an_mag", 120.0)

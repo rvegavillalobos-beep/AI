@@ -44,9 +44,7 @@ def budget_bars(bud: pd.DataFrame, bat_type: str, title: str | None = None, heig
     for fam in ("Placement", "Size", "Shape"):
         fig.add_trace(go.Bar(x=[None], y=[None], marker_color=P.family(fam), name=fam, showlegend=True))
     fig.update_layout(bargap=0.35)
-    T.style(fig, height=height, title=title)
-    fig.update_layout(legend=dict(y=-0.06, yanchor="top"), margin=dict(t=64, b=40))
-    return fig
+    return T.style(fig, height=height, title=title)  # subplot titles on top → family legend at the bottom
 
 
 def mode_gallery(bud: pd.DataFrame, bat_type: str, nominals: Nominals, magnify: float = 120.0,
