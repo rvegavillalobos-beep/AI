@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Streamlit secrets never go into the repo
+.streamlit/secrets.toml
+
+# Measurement data and generated reports stay local
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+!tests/fixtures/*.csv
+reports/
+.DS_Store
