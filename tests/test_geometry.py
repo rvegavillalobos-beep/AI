@@ -125,3 +125,23 @@ def test_exact_inverse_compensation_puts_the_module_on_nominal(t):
     out2 = geometry.apply_compensation(both, {t: (-tx, -ty, -th)}, NOM)
     np.testing.assert_allclose(out2[0], 0.0, atol=1e-9)
     np.testing.assert_allclose(out2[1], 1.0)
+
+
+def test_why_each_nok_failed():
+    """The counterfactual split used on Shape & Squareness (as in Corner QC)."""
+    t = "Type S"
+    E, _ = geometry.mode_basis(t, NOM)
+    shear = E[:, 5] / np.abs(E[:, 5]).max()          # a pure parallelogram, 1 mm at its largest corner
+    cases = {
+        "Placement": np.tile([3.6, 0.0], 4),                       # shifted out, perfectly square
+        "Shape + placement": np.tile([2.2, 0.0], 4) + 1.5 * shear,  # each alone fits, together they don't
+        "Shape": 3.6 * shear,                                      # square would pass, placement can't help
+        "Both": np.tile([3.6, 0.0], 4) + 3.6 * shear,
+    }
+    df = pd.concat([frame(t, d) for d in cases.values()], ignore_index=True)
+    st = geometry.evaluate_status(df, 3.0)
+    assert (st["Status"] == "FAIL").all()
+    mech = geometry.failure_mechanism(st, 3.0, NOM)
+    assert list(mech["NokCause"]) == list(cases)
+    ok = geometry.failure_mechanism(frame(t, np.zeros(8), "PASS"), 3.0, NOM)
+    assert ok["NokCause"].iloc[0] == ""

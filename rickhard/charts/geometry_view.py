@@ -60,10 +60,11 @@ def outlines(df: pd.DataFrame, nominals: Nominals, limit: float, exaggeration: f
     fig = go.Figure()
     if not types:
         types = sorted(df["BatteryType"].unique()) if len(df) else []
-    for t in types:
+    for i, t in enumerate(types):
         nom = nominals.get(t)
         xs, ys = polygon(nom)
-        fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines", name=f"Nominal {t}",
+        fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines", name=f"Nominal {t}", legendgroup="ref",
+                                 legendgrouptitle_text="Reference" if i == 0 else None,
                                  line=dict(color=P.nominal, width=2, dash="dash"), hoverinfo="skip"))
         _tol_boxes(fig, nom, limit * exaggeration, T.rgba(T.STATUS["warning"], 0.9))
     groups = {"PASS": [], "FAIL": [], "INCOMPLETE": []}
@@ -141,7 +142,7 @@ def outlines(df: pd.DataFrame, nominals: Nominals, limit: float, exaggeration: f
         fig.update_layout(height=height + 20 * rows,
                           legend=dict(orientation="h", x=0, xanchor="left", y=-0.1, yanchor="top", entrywidth=150,
                                       font=dict(size=10), groupclick="toggleitem", itemclick="toggle",
-                                      itemdoubleclick="toggleothers"),
+                                      itemdoubleclick="toggleothers", traceorder="grouped", tracegroupgap=6),
                           margin=dict(t=12))
     return fig
 

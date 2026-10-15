@@ -88,7 +88,7 @@ def gap_hist(pairs: pd.DataFrame, max_gap: float, title: str | None = None, heig
 # Height (Z)
 # ---------------------------------------------------------------------------
 
-def z_surface(surf: dict, bat_type: str, title: str | None = None, height: int = 420) -> go.Figure:
+def z_surface(surf: dict, bat_type: str, title: str | None = None, height: int = 330) -> go.Figure:
     """Top view of the average module surface: colour = fitted height Z,
     with the mean Z of each corner (same orientation as the outline plots)."""
     P = T.pal()
@@ -115,8 +115,10 @@ def z_surface(surf: dict, bat_type: str, title: str | None = None, height: int =
         textfont=dict(size=12, color=P.ink["primary"]), marker=dict(size=10, color=P.type(bat_type),
                                                                    line=dict(color=P.ink["surface"], width=2)),
         hovertemplate="%{text} mm (mean corner Z)<extra></extra>", showlegend=False))
-    fig.update_xaxes(title_text="Global X (mm) — front →", showgrid=False)
-    fig.update_yaxes(title_text="Global Y (mm)", autorange="reversed", scaleanchor="x", scaleratio=1, showgrid=False)
+    fig.update_xaxes(title_text="Global X (mm) — front →", showgrid=False,
+                     range=[min(cx) - 120, max(cx) + 120], constrain="domain")
+    fig.update_yaxes(title_text="Global Y (mm)", showgrid=False, range=[max(cy) + 140, min(cy) - 140],
+                     scaleanchor="x", scaleratio=1, constrain="domain")
     return T.style(fig, height=height, title=title, legend=False)
 
 
