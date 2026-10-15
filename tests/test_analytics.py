@@ -75,6 +75,22 @@ def test_change_point_finds_a_step():
     assert spc.change_points(rng.normal(0, 1, 300)) == []
 
 
+def test_weekly_xbar_limits_follow_the_chosen_baseline():
+    rng = np.random.default_rng(8)
+    dates = pd.Timestamp("2026-07-06") + pd.to_timedelta(np.arange(400) * 3, unit="h")   # 8 per day, ~7 weeks
+    y = np.where(np.arange(400) < 200, 1.5, 0.0) + rng.normal(0, 0.5, 400)               # a step half-way
+    week = dates.isocalendar().week.to_numpy()
+    df = pd.DataFrame({"Date": dates, "WeekKey": week, "CalendarWeek": [f"CW{w:02d}" for w in week], "v": y})
+    cc_all, tab = spc.xbar_s(df, "v")
+    assert cc_all.center == pytest.approx(y.mean())
+    cc_new, _ = spc.xbar_s(df, "v", baseline=(dates[200], None))
+    assert cc_new.center == pytest.approx(y[200:].mean())
+    assert cc_new.flags[1][:3].all() and not cc_new.flags[1][-3:].any()   # old weeks out against today's level
+    cc_old, _ = spc.xbar_s(df, "v", baseline=(None, dates[49]))
+    assert cc_old.center == pytest.approx(y[:50].mean())
+    assert len(tab) == len(cc_all.x)
+
+
 def _first_runs(values, start="2026-07-01", per_day=20):
     n = len(values)
     dates = pd.Timestamp(start) + pd.to_timedelta(np.arange(n) * (24 / per_day), unit="h")

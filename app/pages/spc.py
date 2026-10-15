@@ -69,10 +69,12 @@ y = s[col].to_numpy(float)
 cps = spc.change_points(y, min_size=max(12, len(y) // 40))
 if base_mode == "Since the last detected shift" and cps:
     baseline = slice(cps[-1], None)
+    week_base = (s["Date"].iloc[cps[-1]], None)
 elif base_mode == "First 50 modules":
     baseline = slice(0, min(50, len(y)))
+    week_base = (None, s["Date"].iloc[min(50, len(y)) - 1])
 else:
-    baseline = None
+    baseline = week_base = None
 chart = spc.imr(y, baseline=baseline)
 spec = (-r.spec_limit, r.spec_limit) if col in DEV_COLS else None
 labels = [f"{p} · {d:%Y-%m-%d %H:%M} · {st_}" for p, d, st_ in zip(s["PartID"], s["Date"], s["Status"])]
@@ -88,9 +90,11 @@ for i, (k, v) in enumerate(counts.items(), start=1):
     m[i].metric(k, v, border=True)
 st.caption(csp.rules_legend())
 
-xb = spc.xbar_s(a.first[a.first["BatteryType"] == t], col)
+xb = spc.xbar_s(a.first[a.first["BatteryType"] == t], col, baseline=week_base)
 if xb is not None:
-    ui.section("Weekly means (X̄ chart)", "Each point is a week's mean; the limits narrow with the number of modules.")
+    ui.section("Weekly means (X̄ chart)", "Each point is a week's mean; the limits narrow with the number of modules. "
+                                         "Centre and σ come from the same modules as the I-MR limits (Control "
+                                         "limits from).")
     ui.chart(csp.xbar_chart(xb[0], xb[1], var, unit), "spc_xbar")
 
 if cps:

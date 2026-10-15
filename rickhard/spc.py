@@ -119,10 +119,23 @@ def imr(values, baseline=None, rules=(1, 2, 3, 5, 6)) -> ControlChart | None:
                         flags=nelson_rules(x, center, sigma, rules), mr=mr, mr_ucl=3.267 * mrbar)
 
 
+def _pooled_sd(t: pd.DataFrame) -> float:
+    t = t[t["n"] >= 2]
+    dof = float((t["n"] - 1).sum())
+    return float(np.sqrt(((t["n"] - 1) * t["sd"] ** 2).sum() / dof)) if dof > 0 else np.nan
+
+
 def xbar_s(df: pd.DataFrame, value: str, group: str = "WeekKey", label: str = "CalendarWeek",
-           rules=(1, 2, 3, 5, 6)):
-    """Weekly means; limits follow each week's n. Returns (chart, table) or None."""
-    d = df[[group, label, value]].dropna()
+           rules=(1, 2, 3, 5, 6), baseline: tuple | None = None):
+    """Weekly means; limits follow each week's n. Returns (chart, table) or None.
+
+    ``baseline`` = (from, to) dates (either may be None): the centre line and
+    the pooled within-week σ are then estimated from those modules only (as the
+    I-MR chart's "control limits from"), and every week is judged against them.
+    Without it, all weeks are used (phase I).
+    """
+    cols = [group, label, value] + (["Date"] if baseline is not None and "Date" in df else [])
+    d = df[cols].dropna(subset=[value])
     if d.empty:
         return None
     g = d.groupby([group, label])[value]
@@ -131,7 +144,19 @@ def xbar_s(df: pd.DataFrame, value: str, group: str = "WeekKey", label: str = "C
     if len(t) < 3:
         return None
     center = float((t["mean"] * t["n"]).sum() / t["n"].sum())
-    pooled = float(np.sqrt(((t["n"] - 1) * t["sd"] ** 2).sum() / (t["n"] - 1).sum()))
+    pooled = _pooled_sd(t)
+    if baseline is not None and "Date" in d:
+        lo, hi = baseline
+        keep = pd.Series(True, index=d.index)
+        if lo is not None:
+            keep &= d["Date"] >= lo
+        if hi is not None:
+            keep &= d["Date"] <= hi
+        b = d[keep]
+        gb = b.groupby(group)[value]
+        tb = pd.DataFrame({"n": gb.size(), "sd": gb.std(ddof=1)})
+        if len(b) >= 10 and np.isfinite(_pooled_sd(tb)):
+            center, pooled = float(b[value].mean()), _pooled_sd(tb)
     sig = pooled / np.sqrt(t["n"].to_numpy(float))
     x = t["mean"].to_numpy(float)
     cc = ControlChart(x=x, center=center, sigma=sig, ucl=center + 3 * sig, lcl=center - 3 * sig,

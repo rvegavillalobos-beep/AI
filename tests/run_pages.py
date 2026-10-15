@@ -63,6 +63,11 @@ def main() -> int:
     results.append(scenario("events after logging", "events"))
     results.append(scenario("reports: build both", "reports", click={"rep_xlsx_go", "rep_html_go"}))
     results.append(scenario("data: apply reading options", "data", click={"Apply and re-read"}))
+    for base in ("First 50 modules", "All data"):
+        def spc_base(b=base):
+            st.session_state["p_spc_base"] = b
+            st.session_state["p_spc_var"] = "Worst corner |dev|" if b == "All data" else "Yaw (fit)"
+        results.append(scenario(f"spc: limits from {base.lower()}", "spc", before=spc_base))
 
     def type_m_only():
         st.session_state["sb_types"] = "Type M"
