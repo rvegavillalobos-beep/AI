@@ -263,7 +263,7 @@ def run_table_config() -> dict:
     cfg = {
         "Date": cc.DatetimeColumn("Date", format="YYYY-MM-DD HH:mm"),
         "CalendarWeek": cc.TextColumn("Week"),
-        "PartID": cc.TextColumn("Part ID", width="medium"),
+        "PartID": cc.TextColumn("Part ID", width=270),  # wide enough for the whole ID
         "BatteryType": cc.TextColumn("Type"),
         "RunNum": cc.NumberColumn("Run", format="%d"),
         "CornersOutOfSpec": cc.NumberColumn("Corners out", format="%d"),
