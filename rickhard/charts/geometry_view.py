@@ -116,19 +116,17 @@ def outlines(df: pd.DataFrame, nominals: Nominals, limit: float, exaggeration: f
     fig.update_yaxes(title_text="Global Y (mm)", autorange="reversed", scaleanchor="x", scaleratio=1)
     T.style(fig, height=height, title=title)
     if per_module:
-        # one entry per module with the full Part ID: a NOK column and an OK column under the axis title
-        # (the nominal is named in the note instead). The figure grows by the longest column, so the
-        # drawing keeps its size and the legend never needs a scrollbar.
+        # one entry per module with the full Part ID, NOK first then OK, in one column under the axis title
+        # (the nominal is named in the note instead). The figure grows by exactly that list, so the drawing
+        # keeps its size and the legend never needs a scrollbar, whatever the page width.
         fig.update_traces(showlegend=False, selector=dict(legendgroup="ref"))
-        names = [f"{it[3]} · R{it[4]}" for v in groups.values() for it in v]
-        entry_w = int(min(380, 44 + 5.9 * max(len(n) for n in names)))
-        tallest = max(len(v) for v in groups.values())
-        leg_h = 34 + 19 * tallest
+        n_groups = sum(1 for v in groups.values() if v)
+        leg_h = 19 * n_mod + 28 * n_groups + 12
         fig.update_layout(height=height + leg_h, margin=dict(t=12, b=72 + leg_h),
-                          legend=dict(orientation="h", x=0, xanchor="left", yref="container", y=0, yanchor="bottom",
-                                      entrywidth=entry_w, maxheight=leg_h + 20, font=dict(size=10),
-                                      groupclick="toggleitem", itemclick="toggle", itemdoubleclick="toggleothers",
-                                      traceorder="grouped", tracegroupgap=6))
+                          legend=dict(orientation="v", x=0, xanchor="left", yref="container", y=0, yanchor="bottom",
+                                      maxheight=leg_h + 40, font=dict(size=10), groupclick="toggleitem",
+                                      itemclick="toggle", itemdoubleclick="toggleothers", traceorder="grouped",
+                                      tracegroupgap=10))
     if exaggeration != 1:
         fig.add_annotation(**_scale_note(f"deviations ×{exaggeration:g} · boxes = ±{limit:g} mm (scaled)"
                                          + (" · green dashed = nominal" if per_module else "")))
