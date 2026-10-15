@@ -27,10 +27,16 @@ def test_excel_report(demo_analysis, demo_ds, bundle, event_table):
                               event_table, comp_rows, title="Test report")
     wb = openpyxl.load_workbook(io.BytesIO(data))
     names = wb.sheetnames
-    for sheet in ("Weekly FPY", "First runs", "Module report (all runs)", "Capability", "Failure mechanisms",
-                  "Squareness (all runs)", "Vector drift", "Process shifts", "SPC alarms", "Compensation",
-                  "Interventions", "Data health"):
+    # the original export's sheets come first, under the same names
+    original = ["Module_Summary_Report", "First_Run_Quality_Summary", "Weekly_FPY_Trend", "Failure_Pareto",
+                "Corner_Capability", "Squareness_Analysis", "Vector_Drift_Analysis", "Compensation_Summary"]
+    assert names[1:1 + len(original)] == original
+    for sheet in ("First runs", "Failure mechanisms", "Process shifts", "SPC alarms", "Interventions", "Data health"):
         assert sheet in names, sheet
+    kpi = {wb["First_Run_Quality_Summary"].cell(row=r_, column=1).value:
+           wb["First_Run_Quality_Summary"].cell(row=r_, column=2).value for r_ in range(1, 8)}
+    assert kpi["Total Unique Modules Evaluated"] == str(len(demo_analysis.first))
+    assert kpi["First Pass Yield (FPY)"] == f"{demo_analysis.fpy:.1f}%"
     ws = wb["First runs"]
     assert ws.max_row - 1 >= len(demo_analysis.first)          # one row per module (+ header / notes)
     assert all(len(n) <= 31 for n in names)

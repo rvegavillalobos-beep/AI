@@ -15,10 +15,11 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from rickhard import analysis, compensation, demo, improvement, insights, loading, remeasure, spc
+from rickhard import analysis, compensation, demo, geometry, improvement, insights, loading, remeasure, spc
 from rickhard import events as ev_mod
 from rickhard.analysis import Analysis
 from rickhard.config import LoadOptions, Scope, Settings
+from rickhard.constants import DEV_COLS
 from rickhard.loading import Dataset
 
 from . import state
@@ -184,6 +185,13 @@ def sensitivity(key: str, comps_sig: str, compensate: bool, _a: Analysis, _comps
                                           compensate=compensate)
 
 
+@st.cache_data(max_entries=48, show_spinner=False)
+def best_by_yaw(key: str, bat_type: str, weeks: int, dx: float, dy: float, yaws: tuple, _a: Analysis) -> np.ndarray:
+    v = window(_a, bat_type, weeks)
+    return compensation.best_fpy_by_yaw(v, yaws, _a.settings.rules.spec_limit, _a.settings.nominals,
+                                        center=(dx, dy))
+
+
 def window(a: Analysis, bat_type: str, weeks: int) -> pd.DataFrame:
     v = a.first[a.first["BatteryType"] == bat_type]
     wk = sorted(v["WeekKey"].dropna().unique())[-int(weeks):]
@@ -202,10 +210,43 @@ def chosen_compensation() -> dict:
     return dict(st.session_state.get("_chosen_comp") or {})
 
 
-def set_chosen_compensation(bat_type: str, setting: tuple, method: str) -> None:
+def set_chosen_compensation(bat_type: str, setting: tuple, method: str, weeks: int | None = None) -> None:
     d = chosen_compensation()
-    d[bat_type] = {"setting": tuple(float(x) for x in setting), "method": method}
+    d[bat_type] = {"setting": tuple(float(x) for x in setting), "method": method, "weeks": weeks}
     st.session_state["_chosen_comp"] = d
+
+
+SIM_COLS = ["Date", "CalendarWeek", "PartID", "BatteryType", "RunNum", *DEV_COLS, "Status",
+            *[f"{k}_Sim" for k in DEV_COLS], "Status_Sim", "Centroid_X", "Centroid_Y", "Rotation_Angle",
+            "Centroid_X_Sim", "Centroid_Y_Sim", "Rotation_Angle_Sim"]
+
+
+def compensation_export(a: Analysis) -> tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None]:
+    """The chosen compensation per type as the original export's three sheets:
+    summary, equivalent corner offsets and the simulated modules."""
+    chosen = chosen_compensation()
+    if not chosen:
+        return None, None, None
+    lim, nom = a.settings.rules.spec_limit, a.settings.nominals
+    rows, offs, sims = [], [], []
+    for t, ch in chosen.items():
+        v = window(a, t, int(ch.get("weeks") or 6))
+        if v.empty:
+            continue
+        s = ch["setting"]
+        before = compensation.evaluate(v, (0.0, 0.0, 0.0), lim, nom)
+        after = compensation.evaluate(v, s, lim, nom)
+        rows.append({"BatteryType": t, "Method": ch["method"], "Window": window_label(v), "Modules": len(v),
+                     "X [mm]": s[0], "Y [mm]": s[1], "Yaw [°]": s[2], "FPY measured %": before["fpy"],
+                     "FPY simulated %": after["fpy"], "Gain (pp)": after["fpy"] - before["fpy"]})
+        o = geometry.corner_offsets(t, *s, nom)
+        o.insert(1, "Method", ch["method"])
+        offs.append(o)
+        sim = compensation.simulate_table(v, s, lim, nom)
+        sims.append(sim[[c for c in SIM_COLS if c in sim.columns]])
+    if not rows:
+        return None, None, None
+    return pd.DataFrame(rows), pd.concat(offs, ignore_index=True), pd.concat(sims, ignore_index=True)
 
 
 def nice_float(v, nd=2) -> str:

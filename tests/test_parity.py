@@ -1,4 +1,12 @@
-"""The new code reproduces the original RICKHARDV numbers on the same export."""
+"""The new code reproduces the original RICKHARDV numbers on the same export.
+
+Runs on a synthetic export (no daylight-saving hours, duplicate rows or all-zero
+reads: the original app crashes on the first and miscounts the others). Set
+RICKHARD_REAL_FILE=/path/to/export.xlsx (QC_REAL_FILE also works) to check a
+real export as well.
+"""
+
+import os
 
 import numpy as np
 import pandas as pd
@@ -14,12 +22,28 @@ LIMIT = 3.0
 NOM = Nominals()
 
 
-@pytest.fixture(scope="module")
-def both(synth_xlsx, original_opts):
-    _, summary, _, first_valid = orig.original_pipeline(NamedBytes(synth_xlsx, "synthetic.xlsx"), LIMIT, True)
-    ds = loading.build_dataset([("synthetic.xlsx", synth_xlsx)], original_opts)
+def _sources():
+    yield "synthetic"
+    real = os.environ.get("RICKHARD_REAL_FILE") or os.environ.get("QC_REAL_FILE")
+    if real and os.path.exists(real):
+        yield real
+
+
+@pytest.fixture(scope="module", params=list(_sources()), ids=lambda p: os.path.basename(p))
+def both(request, synth_xlsx, original_opts):
+    if request.param == "synthetic":
+        data, name = synth_xlsx, "synthetic.xlsx"
+    else:
+        with open(request.param, "rb") as fh:
+            data, name = fh.read(), os.path.basename(request.param)
+    _, summary, _, first_valid = orig.original_pipeline(NamedBytes(data, name), LIMIT, True)
+    ds = loading.build_dataset([(name, data)], original_opts)
     runs = geometry.evaluate_status(ds.runs, LIMIT)
     first = metrics.first_runs(runs, incomplete_as_fail=True)
+    if request.param != "synthetic":
+        # the original turns an exact duplicate row into a fake extra run: leave those out of the comparison
+        keys = set(zip(runs["PartID"].astype(str), runs["RunNum"].astype(int)))
+        summary = summary[[k in keys for k in zip(summary["PartID"].astype(str), summary["RunNum"].astype(int))]]
     return summary, first_valid, runs, first
 
 

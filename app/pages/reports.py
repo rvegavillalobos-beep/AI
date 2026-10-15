@@ -1,6 +1,5 @@
 from datetime import datetime
 
-import pandas as pd
 import streamlit as st
 
 from app import data, state, ui
@@ -17,9 +16,12 @@ rb = data.remeasure_bundle(c.key, 120.0, a)
 extras = dict(bundle["extras"])
 extras["repeatability"] = rb["rep"]
 chosen = data.chosen_compensation()
-comp_rows = pd.DataFrame([{"BatteryType": t, "Method": v["method"], "X [mm]": v["setting"][0],
-                           "Y [mm]": v["setting"][1], "Yaw [°]": v["setting"][2]} for t, v in chosen.items()]) \
-    if chosen else None
+comp_rows, comp_offsets, comp_sims = data.compensation_export(a)
+comp_html = None
+if comp_rows is not None:
+    comp_html = comp_rows[["BatteryType", "Method", "Window", "Modules", "X [mm]", "Y [mm]", "Yaw [°]"]].copy()
+    comp_html["FPY"] = [f"{b_:.1f}% → {a_:.1f}%" for b_, a_ in zip(comp_rows["FPY measured %"],
+                                                                  comp_rows["FPY simulated %"])]
 stamp = datetime.now().strftime("%Y%m%d_%H%M")
 sig = c.key + "|" + repr(sorted(chosen.items())) + "|" + repr(state.events())
 
@@ -34,7 +36,8 @@ with left:
         if st.button("Prepare Excel", icon=":material/table_view:", key="rep_xlsx_go", width="stretch"):
             with st.spinner("Writing the workbook…"):
                 st.session_state["_rep_xlsx"] = (sig, report.build_excel(
-                    a, bundle["insights"], bundle["actions"], extras, c.ds.health, c.events, comp_rows, title=title))
+                    a, bundle["insights"], bundle["actions"], extras, c.ds.health, c.events, comp_rows, title=title,
+                    comp_offsets=comp_offsets, comp_sims=comp_sims))
         got = st.session_state.get("_rep_xlsx")
         if got and got[0] == sig:
             ui.download_bytes("Download Excel report", got[1], f"RICKHARD_X_report_{stamp}.xlsx",
@@ -49,7 +52,7 @@ with right:
         offline = st.toggle("Works offline (embeds the chart library, ~5 MB)", key=state.init("p_rep_off", False))
         if st.button("Prepare HTML report", icon=":material/summarize:", key="rep_html_go", width="stretch"):
             with st.spinner("Building the report…"):
-                html_doc = report_html.build_html(a, bundle["insights"], bundle["actions"], c.events, comp_rows,
+                html_doc = report_html.build_html(a, bundle["insights"], bundle["actions"], c.events, comp_html,
                                                   title=st.session_state.get("p_rep_title", "ST020 corner deviation report"),
                                                   offline=offline, note=note)
                 st.session_state["_rep_html"] = (sig + f"|{offline}|{note}", html_doc.encode("utf-8"))

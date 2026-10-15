@@ -290,10 +290,15 @@ def focus_note(c) -> None:
     key = state.focus()
     if not key:
         return
-    left, right = st.columns([6, 1], vertical_alignment="center")
-    left.caption(f"Focused module: **{key}** — open it in **Module Passport**, or select another row.")
-    right.button("Clear focus", icon=":material/close:", key=f"clear_focus_{st.session_state.get('_page', '')}",
-                 on_click=state.set_focus, args=(None,), type="tertiary")
+    page = st.session_state.get("_page", "")
+    links = [(p, lab, ic) for p, lab, ic in (("geometry", "Geometry", ":material/view_in_ar:"),
+                                             ("passport", "Passport", ":material/badge:")) if p != page]
+    cols = st.columns([5] + [1.3] * len(links) + [1.2], vertical_alignment="center")
+    cols[0].caption(f"Focused module: **{key}**")
+    for col, (p, lab, ic) in zip(cols[1:], links):
+        col.page_link(f"app/pages/{p}.py", label=f"Open in {lab}", icon=ic)
+    cols[-1].button("Clear focus", icon=":material/close:", key=f"clear_focus_{page}",
+                    on_click=state.set_focus, args=(None,), type="tertiary")
 
 
 def download_bytes(label: str, data: bytes, file_name: str, mime: str, key: str, icon: str = ":material/download:",

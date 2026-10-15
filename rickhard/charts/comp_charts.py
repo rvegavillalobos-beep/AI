@@ -56,12 +56,22 @@ def landscape(land: dict, points: dict, title: str | None = None, height: int = 
     return T.style(fig, height=height, title=title)
 
 
-def yaw_sweep(yaws, fpy, points: dict, title: str | None = None, height: int = 300) -> go.Figure:
+def yaw_sweep(yaws, fpy, points: dict, title: str | None = None, height: int = 300,
+              best: tuple | None = None) -> go.Figure:
+    """FPY as only the yaw changes (X / Y fixed) and, optionally, the best FPY
+    reachable at each yaw when X / Y are re-optimised."""
     P = T.pal()
     fpy = np.asarray(fpy, float)
     fig = go.Figure(go.Scatter(x=yaws, y=fpy, mode="lines", line=dict(color=P.ink["primary"], width=2),
-                               name="FPY at this yaw", hovertemplate="yaw %{x:+.3f}° → FPY %{y:.1f}%<extra></extra>"))
+                               name="Only yaw changes", hovertemplate="yaw %{x:+.3f}° → FPY %{y:.1f}%<extra></extra>"))
     top = float(np.nanmax(fpy)) if np.isfinite(fpy).any() else 100.0
+    if best is not None and len(best[0]):
+        by, bf = np.asarray(best[0], float), np.asarray(best[1], float)
+        fig.add_trace(go.Scatter(x=by, y=bf, mode="lines", name="Best reachable (X/Y re-optimised)",
+                                 line=dict(color=P.c["violet"], width=2, dash="dash"),
+                                 hovertemplate="yaw %{x:+.3f}° → best FPY %{y:.1f}%<extra></extra>"))
+        if np.isfinite(bf).any():
+            top = max(top, float(np.nanmax(bf)))
     for name, yaw in points.items():
         if yaw is not None and np.isfinite(yaw):
             fig.add_trace(go.Scatter(x=[yaw, yaw], y=[0, top], mode="lines", name=name,

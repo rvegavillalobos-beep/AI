@@ -13,6 +13,7 @@ lim, nom = r.spec_limit, c.nominals
 ui.page_header(c, "compensation", "A rigid X / Y / yaw correction of the module placement (rotation about the nominal "
                                   "module centre), simulated on every first measurement. Nothing here changes the data.")
 ui.require(a.first)
+ui.focus_note(c)
 
 # ---- Controls ---------------------------------------------------------------------------------
 types = c.types
@@ -45,6 +46,11 @@ with ctl[3]:
         mname = st.radio("Median-based method uses", ["Median", "Mean"], horizontal=True, key="p_cp_method")
         state.init("p_cp_minn", 40)
         min_n = st.number_input("Minimum modules to trust a result", 5, 1000, step=5, key="p_cp_minn")
+        state.init("p_cp_margin", 0.2)
+        margin = st.slider("Safety margin to report (mm)", 0.0, 1.0, step=0.05, key="p_cp_margin",
+                           help="The methods table also shows how many modules would pass with at least this much "
+                                "room on every corner — a setting that only passes modules at the edge will not "
+                                "hold up.")
 method_key = "mean" if mname == "Mean" else "median"
 
 v = data.window(a, t, int(weeks))
@@ -96,9 +102,9 @@ bts = comp.backtest_summary(bt)
 rows = []
 none_fpy = comp.evaluate(v, (0.0, 0.0, 0.0), lim, nom)["fpy"]
 for m, s in settings.items():
-    ev_ = comp.evaluate(v, s, lim, nom)
+    ev_ = comp.evaluate(v, s, lim, nom, margin=float(margin))
     rows.append({"Method": m, "X [mm]": s[0], "Y [mm]": s[1], "Yaw [°]": s[2], "In window": ev_["fpy"],
-                 "Δ vs none": ev_["fpy"] - none_fpy, "Backtest": bts.get(m, np.nan)})
+                 "With margin": ev_["fpy_margin"], "Δ vs none": ev_["fpy"] - none_fpy, "Backtest": bts.get(m, np.nan)})
 mt = pd.DataFrame(rows)
 ui.section("Methods compared", "In window: FPY on the same modules the setting was computed from (optimistic). "
                                "Backtest: each recent week gets the setting computed from the weeks before it — the "
@@ -108,6 +114,10 @@ st.dataframe(mt, hide_index=True, width="stretch", column_config={
     "X [mm]": cfg.NumberColumn(format="%+.3f"), "Y [mm]": cfg.NumberColumn(format="%+.3f"),
     "Yaw [°]": cfg.NumberColumn(format="%+.4f"),
     "In window": cfg.ProgressColumn("FPY in window", format="%.1f%%", min_value=0, max_value=100),
+    "With margin": cfg.ProgressColumn(f"Pass with {margin:.2f} mm room", format="%.1f%%", min_value=0,
+                                      max_value=100,
+                                      help="Modules that would still pass with every corner limit tightened by the "
+                                           "safety margin (set it in More)."),
     "Δ vs none": cfg.NumberColumn("Δ vs none (pp)", format="%+.1f"),
     "Backtest": cfg.NumberColumn("FPY backtest", format="%.1f%%")})
 
@@ -147,7 +157,7 @@ with right:
     st.caption("Convention: positive X moves the module towards the front, positive Y towards the right side, "
                "positive yaw turns +X towards +Y. Check the sign convention of your conveyor before applying.")
     if st.button("Use in Path to Target", icon=":material/flag:", width="stretch"):
-        data.set_chosen_compensation(t, (dx, dy, yaw), applied_m)
+        data.set_chosen_compensation(t, (dx, dy, yaw), applied_m, int(weeks))
         st.toast(f"{t}: {applied_m} correction will be used in Path to Target.", icon=":material/check:")
     if st.button("Log as intervention", icon=":material/event_note:", width="stretch",
                  help="Adds an entry to the Interventions log at the end of the data, so you can measure the effect "
@@ -167,11 +177,15 @@ with left:
                           center=(dx / 2, dy / 2))
     ui.chart(ccmp.landscape(land, settings, label="FPY" if sigma == 0 else "Expected FPY"), "cp_land")
 with right:
-    ui.section("FPY vs yaw at this X / Y")
+    ui.section("FPY vs yaw", "Solid: only the yaw changes, X / Y kept at the selected values. Dashed: the best FPY "
+                             "reachable at each yaw when X / Y are re-optimised. The peak is often not at the median "
+                             "yaw, because what matters is each module's worst corner, not the average.")
     yaws = np.round(np.arange(yaw - 0.3, yaw + 0.3001, 0.002), 4)
+    yb = np.round(np.arange(yaw - 0.3, yaw + 0.3001, 0.015), 4)
     ui.chart(ccmp.yaw_sweep(yaws, comp.fpy_vs_yaw(v, dx, dy, yaws, lim, nom),
-                            {m: s[2] for m, s in settings.items() if m != "No compensation"}), "cp_yaw")
-    ui.section("Is it ready?")
+                            {m: s[2] for m, s in settings.items() if m != "No compensation"},
+                            best=(yb, data.best_by_yaw(c.key, t, int(weeks), round(dx, 3), round(dy, 3),
+                                                       tuple(yb), a))), "cp_yaw")
     cp = data.change_points(c.key, a)
     recent_change = False
     t_end = a.first["Date"].max()
@@ -181,7 +195,14 @@ with right:
         dates = vt_all.sort_values("Date").dropna(subset=[col])["Date"].to_numpy()
         if len(dates) and pd.Timestamp(dates[min(idx[-1], len(dates) - 1)]) >= t_end - pd.Timedelta(days=14):
             recent_change = True
-    ui.checklist(comp.readiness(v, bts, recent_change, min_n=int(min_n)))
+    checks = comp.readiness(v, bts, recent_change, min_n=int(min_n))
+    ready = all(ck["ok"] for ck in checks)
+    h1, h2 = st.columns([3, 1.3], vertical_alignment="center")
+    with h1:
+        ui.section("Is it ready?", "Is the process stable enough to trust a compensation on the line?")
+    h2.badge("Ready" if ready else "Not yet", color="green" if ready else "orange",
+             icon=":material/check:" if ready else ":material/hourglass_top:")
+    ui.checklist(checks)
 
 ui.section("Backtest week by week")
 ui.chart(ccmp.backtest_chart(bt, list(comp.METHODS)), "cp_bt")

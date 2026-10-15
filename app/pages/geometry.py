@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -54,30 +53,84 @@ with tab1:
         i0, i1 = 0, 0
     plot_df = base.iloc[int(i0): int(i1) + 1]
     if len(plot_df):
-        st.caption(f"{ui.plural(len(plot_df), 'module')} · {plot_df['Date'].min():%Y-%m-%d %H:%M} – {plot_df['Date'].max():%Y-%m-%d %H:%M}")
+        st.caption(f"{ui.plural(len(plot_df), 'module')} · {plot_df['Date'].min():%Y-%m-%d %H:%M} – "
+                   f"{plot_df['Date'].max():%Y-%m-%d %H:%M}")
+
+    # focus: pick any module by (part of) its ID, or select a row in the table below
     focus = state.focus()
+    keys = base["_mod_key"].iloc[::-1].tolist()
+    options = ["(none)"] + keys
+    if focus not in keys:
+        focus = None
+    sel = st.selectbox("Focus on a module", options, index=options.index(focus) if focus else 0,
+                       help="Type part of a Part ID to search. Selecting a row in a table (here, Shape & Squareness, "
+                            "Compensation Studio…) also sets the focus.")
+    picked = None if sel == "(none)" else sel
+    if picked != focus:
+        state.set_focus(picked)
+        focus = picked
     if focus and focus in set(base["_mod_key"]) and focus not in set(plot_df["_mod_key"]):
         plot_df = pd.concat([plot_df, base[base["_mod_key"] == focus]])
     status_map = {"OK": "PASS", "NOK": "FAIL", "Incomplete": "INCOMPLETE"}
     status_filter = tuple(status_map[s] for s in shown)
-    ui.chart(gv.outlines(plot_df, c.nominals, r.spec_limit, exag, focus_key=focus, types=types,
-                         status_filter=status_filter), "geo_outlines")
-    st.caption("Click a legend entry to hide a group, double-click to isolate it. Select a row below to focus one "
-               "module (it is drawn in violet with its corner values).")
 
-    if focus and focus in set(a.runs["_mod_key"]):
-        row = a.runs[a.runs["_mod_key"] == focus].iloc[0]
-        sq = a.sq_runs[a.sq_runs["_mod_key"] == focus]
-        m = st.columns(5)
-        m[0].metric("Status", row["Status"], border=True)
-        m[1].metric("Worst corner", f"{row['WorstAbs']:.2f} mm" if np.isfinite(row["WorstAbs"]) else "–",
-                    str(row["WorstCoord"] or "").replace("_", " "), delta_color="off", border=True)
-        m[2].metric("Margin to limit", f"{row['Margin']:+.2f} mm" if np.isfinite(row["Margin"]) else "–", border=True)
-        if len(sq):
-            s0 = sq.iloc[0]
-            m[3].metric("Diagonal delta", f"{s0['DeltaDiag']:.2f} mm", s0["SquarenessStatus"], delta_color="off",
-                        border=True)
-            m[4].metric("FL angle deviation", f"{s0['AngleDevFL']:+.3f}°", border=True)
+    left, right = st.columns([3.2, 1], gap="large")
+    with left:
+        ui.chart(gv.outlines(plot_df, c.nominals, r.spec_limit, exag, focus_key=focus, types=types,
+                             status_filter=status_filter), "geo_outlines")
+        st.caption("Up to 60 modules, each is its own legend entry: click one to hide it, double-click to show only "
+                   "that one (double-click again to bring all back). Larger windows are grouped by status.")
+    with right:
+        if focus and focus in set(a.runs["_mod_key"]):
+            row = a.runs[a.runs["_mod_key"] == focus].iloc[0]
+            st.markdown(f"**{row['PartID']}**")
+            st.caption(f"Run {int(row['RunNum'])} · {row['Date']:%Y-%m-%d %H:%M} · {row['BatteryType']} · "
+                       f"{row['CalendarWeek']}")
+            st.badge({"PASS": "OK", "FAIL": "NOK"}.get(row["Status"], row["Status"].title()),
+                     color={"PASS": "green", "FAIL": "red"}.get(row["Status"], "gray"))
+            dev = pd.DataFrame({"Corner": list(CORNERS),
+                                "X (mm)": [row[f"{k}_X"] for k in CORNERS],
+                                "Y (mm)": [row[f"{k}_Y"] for k in CORNERS]})
+            st.dataframe(dev.style.map(lambda v: "background-color:rgba(208,59,59,.18);color:#b02a2a;font-weight:600"
+                                       if pd.notna(v) and abs(v) > r.spec_limit else "", subset=["X (mm)", "Y (mm)"])
+                         .format("{:+.2f}", subset=["X (mm)", "Y (mm)"], na_rep="missing"),
+                         hide_index=True, width="stretch")
+            sq = a.sq_runs[a.sq_runs["_mod_key"] == focus]
+            if len(sq):
+                q = sq.iloc[0]
+                geo = pd.DataFrame({
+                    "Measure": ["Diagonal Δ", "Width Δ (front − rear)", "Length Δ (left − right)", "FL angle Δ",
+                                "Placement uses", "Shape uses"],
+                    "Value": [f"{q['DeltaDiag']:.2f} mm", f"{q['WidthDelta']:+.2f} mm", f"{q['LengthDelta']:+.2f} mm",
+                              f"{q['AngleDevFL']:+.3f}°", f"{q['RigidMax']:.2f} of ±{r.spec_limit:g} mm",
+                              f"{q['ShapeMax']:.2f} of ±{r.spec_limit:g} mm"]})
+                st.dataframe(geo, hide_index=True, width="stretch")
+                if q["SquarenessStatus"] == "DEFORMED":
+                    st.markdown(f":red[**Deformed**] · {str(q['RootCause']).capitalize()}")
+                else:
+                    st.markdown(f":green[**Square**] (diagonal Δ ≤ {r.diag_tol:g} mm)")
+                if row["Status"] != "PASS":
+                    why = {"Placement": "Fails on placement alone: it would fail even if perfectly square.",
+                           "Shape + placement": "Would pass if it were perfectly square (same placement): the shape "
+                                                "ate the margin.",
+                           "Shape": "Its shape alone is out of tolerance, whatever the placement.",
+                           "Both": "Placement alone and shape alone would each fail.",
+                           "Height (Z)": "X and Y are in tolerance; the height (Z) is not."}
+                    st.caption(why.get(str(row.get("NokCause", "")), ""))
+            else:
+                st.caption("Not all four corners were measured: no geometry metrics.")
+            hist = a.runs[a.runs["PartID"] == row["PartID"]].sort_values("RunNum")
+            if len(hist) > 1:
+                st.caption("All runs: " + " → ".join(
+                    f"R{int(rn)} {'OK' if s_ == 'PASS' else ('NOK' if s_ == 'FAIL' else s_.title())}"
+                    for rn, s_ in zip(hist["RunNum"], hist["Status"])))
+            st.page_link("app/pages/passport.py", label="Open in Module Passport", icon=":material/badge:")
+        else:
+            st.info("Pick a module above, or select a row below, to see its deviations and geometry.",
+                    icon=":material/ads_click:")
+        in_view = plot_df[plot_df["Status"].isin(status_filter)]
+        n_ok = int((in_view["Status"] == "PASS").sum())
+        st.caption(f"In view: {ui.plural(len(in_view), 'module')} · {n_ok} OK · {len(in_view) - n_ok} not OK.")
 
     cols = ["_mod_key", "Date", "PartID", "BatteryType", "RunNum", *[f"{k}_{ax}" for k in CORNERS for ax in "XY"],
             "WorstAbs", "Status"]

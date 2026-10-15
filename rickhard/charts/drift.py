@@ -77,6 +77,31 @@ def magnitude_yaw(vec: pd.DataFrame, title: str | None = None, height: int = 520
     return T.style(fig, height=height, title=title, legend_bottom=True)
 
 
+def weekly_medians(vec: pd.DataFrame, title: str | None = None, height: int = 520) -> go.Figure:
+    """Weekly median centroid X, Y (mm) and yaw (°) per battery type."""
+    P = T.pal()
+    if vec.empty:
+        return T.empty("No modules.")
+    fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.06)
+    weeks = vec.drop_duplicates("WeekKey").sort_values("WeekKey")["CalendarWeek"].tolist()
+    for t in sorted(vec["BatteryType"].unique()):
+        g = vec[vec["BatteryType"] == t].groupby(["WeekKey", "CalendarWeek"])
+        w = pd.DataFrame({"N": g.size(), "X": g["Centroid_X"].median(), "Y": g["Centroid_Y"].median(),
+                          "Yaw": g["Rotation_Angle"].median()}).reset_index().sort_values("WeekKey")
+        for row, (col, unit) in enumerate((("X", "mm"), ("Y", "mm"), ("Yaw", "°")), start=1):
+            fig.add_trace(go.Scatter(
+                x=w["CalendarWeek"], y=w[col], mode="lines+markers", name=t, legendgroup=t, showlegend=row == 1,
+                line=dict(color=P.type(t), width=2), marker=dict(size=7, color=P.type(t)), customdata=w["N"],
+                hovertemplate=f"<b>{t}</b> %{{x}} (n=%{{customdata}})<br>median {col} %{{y:+.3f}} {unit}<extra></extra>"),
+                row=row, col=1)
+    for row, label in enumerate(("Median centre X (mm)", "Median centre Y (mm)", "Median yaw (°)"), start=1):
+        T.hline(fig, 0, P.ink["axis"], "solid", 1, None, row=row, col=1)
+        fig.update_yaxes(title_text=label, row=row, col=1)
+        fig.update_xaxes(type="category", categoryorder="array", categoryarray=weeks, row=row, col=1)
+    T.thin_ticks(fig, weeks, max_ticks=8, row=3, col=1)
+    return T.style(fig, height=height, title=title, legend_bottom=True)
+
+
 PLACEMENT_VARS = [("Fit_Tx", "Shift X", "mm"), ("Fit_Ty", "Shift Y", "mm"), ("Fit_Rot", "Yaw", "°")]
 
 

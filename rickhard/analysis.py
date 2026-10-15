@@ -84,6 +84,9 @@ def analyze(runs_all: pd.DataFrame, settings: Settings, scope: Scope, ma_window:
     first["NearMiss"] = (first["Status"] == "PASS") & (first["Margin"] < r.near_miss)
 
     runs = geometry.add_vectors(runs, nom)
+    mech_r = geometry.failure_mechanism(runs, r.spec_limit, nom)
+    for c in ("Mechanism", "NokCause", "PassIfSquare", "PassIfPlaced"):
+        runs[c] = mech_r[c].to_numpy()
     sq_runs = geometry.squareness(runs, r.diag_tol, nom)
     sq_first = first[first["SquarenessStatus"].notna()].copy() if len(first) else first.copy()
 

@@ -92,10 +92,29 @@ def _sheet(wb, name: str, df: pd.DataFrame | None, note: str | None = None, **kw
     _write_table(ws, df, start_row=start, **kw)
 
 
+def first_run_quality_summary(first: pd.DataFrame, incomplete_as_fail: bool) -> pd.DataFrame:
+    """The original app's 'First_Run_Quality_Summary' table."""
+    n = len(first)
+    ok = int((first["Status"] == "PASS").sum()) if n else 0
+    nok = int((first["Status"] == "FAIL").sum()) if n else 0
+    inc = int((first["Status"] == "INCOMPLETE").sum()) if n else 0
+    rows = [("Total Unique Modules Evaluated", str(n)), ("Passed First Inspection (OK)", str(ok)),
+            ("Failed First Inspection (NOK)", str(nok))]
+    if not incomplete_as_fail:
+        rows.append(("Incomplete Measurements", str(inc)))
+    rows.append(("First Pass Yield (FPY)", f"{ok / n * 100:.1f}%" if n else "n/a"))
+    return pd.DataFrame(rows, columns=["Metric", "Value"])
+
+
 def build_excel(a, insights=None, actions=None, extras: dict | None = None, health: dict | None = None,
                 events: pd.DataFrame | None = None, comp_rows: pd.DataFrame | None = None,
-                title: str = "ST020 corner deviation report") -> bytes:
-    """``a`` is a rickhard.analysis.Analysis."""
+                title: str = "ST020 corner deviation report", comp_offsets: pd.DataFrame | None = None,
+                comp_sims: pd.DataFrame | None = None) -> bytes:
+    """``a`` is a rickhard.analysis.Analysis.
+
+    The sheets of the original app's export come first, under the same names
+    (Module_Summary_Report, First_Run_Quality_Summary, Weekly_FPY_Trend, …), so
+    anything built on that file keeps working; the deeper analyses follow."""
     ex = extras or {}
     r = a.settings.rules
     k = a.kpis
@@ -169,27 +188,40 @@ def build_excel(a, insights=None, actions=None, extras: dict | None = None, heal
     ws.column_dimensions["D"].width = 18
     ws.column_dimensions["E"].width = 22
 
-    wk = a.weekly.rename(columns={"PassRate": "FPY %", "MA_FPY": "MA FPY %", "CI_lo": "CI low %", "CI_hi": "CI high %",
-                                  "NearMissRate": "Near miss %"})
-    _sheet(wb, "Weekly FPY", wk.drop(columns=["WeekKey", "LowSample"], errors="ignore"), number_format="0.0")
-    first_cols = ["Date", "CalendarWeek", "Shift", "PartID", "BatteryType", "RunNum", *DEV_COLS, "WorstCoord",
-                  "WorstAbs", "Margin", "Status", "Mechanism", "MechanismDetail", "Fit_Tx", "Fit_Ty", "Fit_Rot",
-                  "Centroid_X", "Centroid_Y", "Rotation_Angle", "ShapeMax", "DeltaDiag", "SquarenessStatus", "RootCause"]
-    _sheet(wb, "First runs", f[[c for c in first_cols if c in f.columns]], limit=r.spec_limit,
-           note="First measurement of every module (the basis of FPY). Red cells: outside the tolerance.")
+    # ---- the original export's sheets, same names ---------------------------------------------
     run_cols = ["Date", "CalendarWeek", "PartID", "BatteryType", "RunNum", *DEV_COLS, "CornersOutOfSpec",
                 "MissingCorners", "IsComplete", "Status"]
-    _sheet(wb, "Module report (all runs)", a.runs[[c for c in run_cols if c in a.runs.columns]], limit=r.spec_limit,
-           note="All measurement runs in chronological order (original 'Module_Summary_Report').")
-    _sheet(wb, "Capability", a.capability.drop(columns=["Coord"], errors="ignore"))
-    _sheet(wb, "Failure mechanisms", a.mechanisms, number_format="0.0")
-    _sheet(wb, "Corner Pareto", a.pareto, number_format="0.0")
+    _sheet(wb, "Module_Summary_Report", a.runs[[c for c in run_cols if c in a.runs.columns]], limit=r.spec_limit,
+           note="All measurement runs in chronological order. Red cells: outside the tolerance.")
+    _sheet(wb, "First_Run_Quality_Summary", first_run_quality_summary(f, r.incomplete_as_fail))
+    wk = a.weekly.rename(columns={"PassRate": "FPY %", "MA_FPY": "MA FPY %", "CI_lo": "CI low %", "CI_hi": "CI high %",
+                                  "NearMissRate": "Near miss %"})
+    _sheet(wb, "Weekly_FPY_Trend", wk.drop(columns=["WeekKey", "LowSample"], errors="ignore"), number_format="0.0")
+    _sheet(wb, "Failure_Pareto", a.pareto, number_format="0.0")
+    _sheet(wb, "Corner_Capability", a.capability.drop(columns=["Coord"], errors="ignore"))
     sq_cols = ["Date", "CalendarWeek", "PartID", "RunNum", "BatteryType", "Diag1", "Diag2", "DeltaDiag", "WidthDelta",
-               "LengthDelta", "AngleDevFL", "SquarenessStatus", "RootCause", "Status"]
-    _sheet(wb, "Squareness (all runs)", a.sq_runs[[c for c in sq_cols if c in a.sq_runs.columns]])
+               "LengthDelta", "AngleDevFL", "SquarenessStatus", "RootCause", "Status", "NokCause", "RigidMax",
+               "ShapeMax", "PassIfSquare", "PassIfPlaced"]
+    _sheet(wb, "Squareness_Analysis", a.sq_runs[[c for c in sq_cols if c in a.sq_runs.columns]])
     vec_cols = ["Date", "CalendarWeek", "PartID", "BatteryType", "Centroid_X", "Centroid_Y", "Vector_Magnitude",
                 "Rotation_Angle", "Fit_Tx", "Fit_Ty", "Fit_Rot", "Status"]
-    _sheet(wb, "Vector drift", f[[c for c in vec_cols if c in f.columns]], number_format="0.000")
+    _sheet(wb, "Vector_Drift_Analysis", f[[c for c in vec_cols if c in f.columns]], number_format="0.000")
+    if comp_rows is not None:
+        _sheet(wb, "Compensation_Summary", comp_rows, number_format="0.000")
+    if comp_offsets is not None:
+        _sheet(wb, "Corner_Offsets", comp_offsets, number_format="0.000")
+    if comp_sims is not None:
+        _sheet(wb, "Simulated_Results", comp_sims, limit=r.spec_limit,
+               note="First runs of the compensation window, measured and with the chosen compensation (_Sim).")
+
+    # ---- deeper analyses ---------------------------------------------------------------------
+    first_cols = ["Date", "CalendarWeek", "Shift", "PartID", "BatteryType", "RunNum", *DEV_COLS, "WorstCoord",
+                  "WorstAbs", "Margin", "Status", "Mechanism", "MechanismDetail", "NokCause", "Fit_Tx", "Fit_Ty",
+                  "Fit_Rot", "Centroid_X", "Centroid_Y", "Rotation_Angle", "ShapeMax", "DeltaDiag", "SquarenessStatus",
+                  "RootCause"]
+    _sheet(wb, "First runs", f[[c for c in first_cols if c in f.columns]], limit=r.spec_limit,
+           note="First measurement of every module (the basis of FPY), with why each NOK failed.")
+    _sheet(wb, "Failure mechanisms", a.mechanisms, number_format="0.0")
     if ex.get("budget") is not None:
         _sheet(wb, "Error budget", ex["budget"], number_format="0.000")
     if ex.get("change_points") is not None:
@@ -198,8 +230,6 @@ def build_excel(a, insights=None, actions=None, extras: dict | None = None, heal
         _sheet(wb, "SPC alarms", ex["alarms"], number_format="0.000")
     if ex.get("repeatability") is not None:
         _sheet(wb, "Repeatability (MSA)", ex["repeatability"], number_format="0.000")
-    if comp_rows is not None:
-        _sheet(wb, "Compensation", comp_rows, number_format="0.000")
     if events is not None and len(events):
         _sheet(wb, "Interventions", events.drop(columns=["WeekKey"], errors="ignore"))
     if health:

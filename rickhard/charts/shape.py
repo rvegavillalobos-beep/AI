@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-from ..constants import SQ_CAUSE_ORDER
+from ..constants import NOK_CAUSE_HELP, NOK_CAUSES, SQ_CAUSE_ORDER
 from . import theme as T
 
 
@@ -58,6 +58,31 @@ def root_causes(sq: pd.DataFrame, title: str | None = None, height: int = 280) -
     fig.update_xaxes(range=[0, 100], ticksuffix="%", title_text="Share of deformed modules")
     fig.update_yaxes(autorange="reversed")
     return T.style(fig, height=height, title=title)
+
+
+def nok_causes(causes: pd.DataFrame | None, title: str | None = None, height: int = 260) -> go.Figure:
+    """Why each NOK module failed (placement / shape counterfactuals), share per battery type."""
+    P = T.pal()
+    if causes is None or causes.empty:
+        return T.empty("No NOK modules with all four corners measured.")
+    t = causes.copy()
+    tot = t.sum(axis=1)
+    pct = t.div(tot, axis=0) * 100
+    fig = go.Figure()
+    for c in NOK_CAUSES:
+        if c not in pct or t[c].sum() == 0:
+            continue
+        fig.add_trace(go.Bar(
+            y=[f"<b>{i}</b><br>{int(n)} NOK" for i, n in zip(pct.index, tot)], x=pct[c], orientation="h", name=c,
+            marker_color=P.nok_cause(c), marker_line=dict(width=1.5, color=P.ink["surface"]),
+            text=[f"{p:.0f}% ({int(n)})" if p >= 14 else "" for p, n in zip(pct[c], t[c])], textposition="inside",
+            insidetextanchor="middle", textfont=dict(color="#ffffff"), customdata=np.stack([t[c], tot], axis=1),
+            hovertemplate=f"{c}: %{{x:.1f}}% (%{{customdata[0]}} of %{{customdata[1]}} NOK)<br>"
+                          f"{NOK_CAUSE_HELP.get(c, '')}<extra></extra>"))
+    fig.update_layout(barmode="stack", bargap=0.45)
+    fig.update_xaxes(range=[0, 100], ticksuffix="%", title_text="Share of NOK modules")
+    fig.update_yaxes(autorange="reversed")
+    return T.style(fig, height=height, title=title, legend_bottom=True)
 
 
 def failure_map(first: pd.DataFrame, limit: float, title: str | None = None, height: int = 470) -> go.Figure:

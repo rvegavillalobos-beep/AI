@@ -15,9 +15,12 @@ A Streamlit dashboard for the first-measurement quality of battery modules at st
   robust optimum), back-tested week by week, with a readiness check and a work instruction for the line.
 - **What would it take to reach the target?** What-if levers simulated on your own modules.
 
-Everything the original RICKHARDV app computed is still here — the corner targets, trend matrix, centroid drift, yaw
-views, squareness report and compensation simulation use the same formulas and give the same numbers (checked by
-the test suite against the original code).
+It builds on [RICKHARDV](https://github.com/rvegavillalobos-beep/RICKHARDV) and on its rebuild *Corner QC*
+([New](https://github.com/rvegavillalobos-beep/New)): everything both computed is still here — corner targets, trend
+matrix, centroid drift and yaw, the squareness report and its link to NOK (would the module have passed if it were
+square?), median-based and optimised compensation with a backtest — with the same formulas and the same numbers
+(checked by the test suite against the original code). The Excel export keeps the original sheet names
+(`Module_Summary_Report`, `First_Run_Quality_Summary`, `Weekly_FPY_Trend`, …), so anything built on it keeps working.
 
 ## Run it
 
@@ -58,16 +61,16 @@ small project file and loaded again later.
 |---|---|---|
 | Overview | **Command Center** | FPY vs target, what the data says in plain language, a ranked action plan with the FPY each action is worth, why and where modules fail. |
 | Analyze | **Corner Lab** | Corner targets, capability per corner and axis (Cp, Cpk, Pp, Ppk with confidence intervals and ppm), offset vs scatter, the original trend matrix. |
-| | **Geometry** | Modules drawn against the nominal outline with magnified deviations (scroll back in time), the week-by-week drift movie, the correction map. |
-| | **Shape & Squareness** | Placement error vs shape error per module, NOK rate by amount of deformation, the original squareness report and root-cause rules. |
-| | **Drift & Yaw** | The original centroid drift and yaw views, plus the least-squares placement over time with automatically dated process shifts. |
+| | **Geometry** | Modules drawn against the nominal outline with magnified deviations (scroll back in time; each module is a legend entry to hide or isolate), a focused module's corner values and geometry, the week-by-week drift movie, the correction map. |
+| | **Shape & Squareness** | Is deformation behind the NOK? Why each NOK failed (placement / shape + placement / shape), the tolerance the shape uses up, NOK rate by amount of deformation, the original squareness report and root-cause rules. |
+| | **Drift & Yaw** | The original centroid path, weekly median offset and yaw, yaw of every module, plus the least-squares placement over time with automatically dated process shifts. |
 | | **Error Anatomy** | The eight-mode decomposition: error budget (systematic vs random), data-driven modes (PCA), which modes drive NOK, weekly mode trends. |
 | Monitor | **SPC Monitor** | Alarm board (recent window vs baseline), I-MR and weekly X̄ charts with Nelson rules. |
 | | **Time Patterns** | Shifts, weekday × hour, and the first modules after the line stood still. |
 | | **Re-measurement & MSA** | %GRR per corner coordinate estimated from production re-measurements; how often a NOK turns OK on the next run. |
 | | **Height (Z)** | Level, pitch, roll and twist of every module (shown when the export contains Z). |
 | Improve | **Path to Target** | What-if levers: how much offset and scatter must go to reach the FPY target, with a sensitivity chart. |
-| | **Compensation Studio** | Median, rigid-fit and robust compensation compared in-window and out-of-sample, FPY maps over X / Y / yaw, readiness checklist, work instruction, piece-level simulation. |
+| | **Compensation Studio** | Median, rigid-fit, robust and your own X / Y / yaw compared in-window, with a safety margin and out-of-sample (backtest), FPY maps over X / Y and yaw, readiness checklist, work instruction, piece-level simulation. |
 | | **Interventions** | Log what was done to the line and get a before / after verdict with statistics. |
 | Tools | **Module Passport** | Everything about one module: runs, geometry, why it failed, what was produced around it. |
 | | **Data & Settings** | Data-quality report, reading options, nominal geometry, shift plan, project file. |
@@ -75,6 +78,16 @@ small project file and loaded again later.
 
 The sidebar holds the filters (calendar weeks, battery type) and the quality rules (tolerance, FPY target,
 squareness limit, whether incomplete modules count as NOK, whether Z decides PASS/FAIL).
+
+## Fixed from the original
+
+- An export containing the skipped spring daylight-saving hour in Germany stopped the app with an error, and rows in
+  the repeated autumn hour were lost. Now both are converted and counted in the data-quality report.
+- The time format was guessed from the first row: with an "am" time on top, every "pm" row was silently dropped.
+- Calendar weeks had no year, so CW01 sorted before CW52 at the turn of the year (now `2026-CW53`, `2027-CW01`).
+- An exact duplicate row created a fake, incomplete re-measurement; overlapping exports doubled modules.
+- All-zero failed reads were used as perfect corners.
+- Everything was recomputed row by row on every click; reading and analysis are now vectorised and cached.
 
 ## How the numbers are made
 
@@ -108,4 +121,9 @@ pytest
 ```
 
 The suite checks loading edge cases, parity with the original RICKHARDV formulas, the geometry and compensation
-maths, SPC, insights and both reports, and renders every page in many scenarios. CI runs it on every push.
+maths, SPC, insights and both reports, and renders every page in many scenarios. CI runs it on every push. To also
+compare a real export with the original logic:
+
+```bash
+RICKHARD_REAL_FILE=/path/to/export.xlsx pytest tests/test_parity.py
+```

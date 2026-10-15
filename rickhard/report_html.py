@@ -68,7 +68,9 @@ def _build(a, insights, actions, events, comp_rows, title, offline, note) -> str
     figs = [
         ("Weekly first-pass yield", co.weekly_fpy(a.weekly, r.fpy_target, 3, not r.incomplete_as_fail, events, height=420)),
         ("Why NOK modules fail", co.mechanisms(a.mechanisms, height=280)),
-        ("Where on the module NOK happens", co.hotspot_map(f, r.spec_limit, a.settings.nominals, a.types, height=340)),
+        ("Where on the module NOK happens", co.hotspot_map(f, r.spec_limit, a.settings.nominals, a.types, height=340),
+         "Bubble: share of modules out of tolerance at that corner · arrow: the corner's mean error ×150 · "
+         "front of the module to the right."),
         ("Corner and axis out of tolerance", co.corner_pareto(a.pareto, k["fail"], height=330)),
         ("Capability per corner and axis (Ppk)", cc.capability_grid(a.capability, height=360)),
     ]
@@ -76,8 +78,10 @@ def _build(a, insights, actions, events, comp_rows, title, offline, note) -> str
     for t in a.types:
         figs.append((f"Error budget · {t}", ca.budget_bars(bud, t, height=380)))
     chart_html = ""
-    for i, (h, fig) in enumerate(figs):
-        chart_html += f"<section class='chart'><h3>{html.escape(h)}</h3>{_fig_html(fig, i == 0, include)}</section>"
+    for i, (h, fig, *fig_note) in enumerate(figs):
+        cap = f"<div class='meta'>{html.escape(fig_note[0])}</div>" if fig_note else ""
+        chart_html += (f"<section class='chart'><h3>{html.escape(h)}</h3>{_fig_html(fig, i == 0, include)}{cap}"
+                       "</section>")
     comp_html = ""
     if comp_rows is not None and len(comp_rows):
         comp_html = "<h2>Compensation</h2>" + comp_rows.to_html(index=False, float_format=lambda v: f"{v:+.3f}",

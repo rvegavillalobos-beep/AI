@@ -65,6 +65,10 @@ class Palette:
         return {"Parallelogram Tilt": self.c["yellow"], "Trapezoidal Width": self.c["aqua"],
                 "Trapezoidal Length": self.c["violet"], "Combined Asymmetry": self.c["magenta"]}.get(c, self.ink["muted"])
 
+    def nok_cause(self, c: str) -> str:
+        return {"Placement": self.c["blue"], "Shape + placement": self.c["yellow"], "Shape": self.c["magenta"],
+                "Both": self.c["violet"], "Height (Z)": self.c["aqua"]}.get(c, self.ink["muted"])
+
     def series(self, i: int) -> str:
         order = ["blue", "orange", "aqua", "yellow", "magenta", "green", "violet", "red"]
         return self.c[order[i % len(order)]]

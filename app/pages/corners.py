@@ -46,6 +46,11 @@ with left:
                                                  "(long-term σ). 'Offset': the mean is ≥ ¼ of the tolerance off nominal — "
                                                  "a correction helps. 'Scatter': Pp < 1 — the spread itself is too wide.")
     ui.chart(cc_charts.capability_grid(cap), "cn_capgrid")
+    wt = cap[(cap["BatteryType"] == t) & cap["Axis"].isin(["X", "Y"])].sort_values("OutPct", ascending=False)
+    if len(wt):
+        w0 = wt.iloc[0]
+        st.caption(f"Worst for {t}: **{w0['Corner']} {w0['Axis']}**, out of tolerance in {w0['OutPct']:.1f}% of "
+                   f"modules (mean {w0['Mean']:+.2f} mm, σ {w0['Std']:.2f} mm) — {str(w0['Diagnosis']).lower()}.")
 with right:
     coords = [f"{k} {ax}" for k in CORNERS for ax in ("X", "Y")]
     worst = cap[(cap["BatteryType"] == t) & cap["Axis"].isin(["X", "Y"])].sort_values("Ppk")
@@ -67,7 +72,8 @@ with st.expander("Capability table", icon=":material/table_chart:"):
         "Cp": cfg.NumberColumn(format="%.2f"), "Cpk": cfg.NumberColumn(format="%.2f"),
         "Pp": cfg.NumberColumn(format="%.2f"), "Ppk": cfg.NumberColumn(format="%.2f"),
         "PpkLo": cfg.NumberColumn("Ppk 95% low", format="%.2f"), "PpkHi": cfg.NumberColumn("Ppk 95% high", format="%.2f"),
-        "PPM": cfg.NumberColumn("Expected PPM", format="%.0f"), "OutPct": cfg.NumberColumn("Out of tol.", format="%.1f%%"),
+        "PPM": cfg.NumberColumn("Expected PPM", format="%.0f"),
+        "OutPct": cfg.ProgressColumn("Out of tol.", format="%.1f%%", min_value=0, max_value=100),
     })
     st.caption("Cp/Cpk use the short-term σ from consecutive modules (moving range); Pp/Ppk the overall σ. "
                "A big gap between them means the process moves over time (drift, shifts between weeks).")

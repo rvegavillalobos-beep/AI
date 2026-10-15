@@ -75,3 +75,15 @@ MECHANISM_HELP = {
     "Height (Z)": "X and Y are in tolerance; the corner height (Z) is not.",
     "Missing corner": "A corner was not measured in the first run.",
 }
+
+# Why a NOK module failed, from the two counterfactuals (perfect shape with its
+# own placement / perfect placement with its own shape).
+NOK_CAUSES: tuple[str, ...] = ("Placement", "Shape + placement", "Shape", "Both", "Height (Z)")
+NOK_CAUSE_HELP = {
+    "Placement": "Fails even if it were perfectly square: the placement alone is out of tolerance.",
+    "Shape + placement": "Would pass if square and would pass if perfectly placed: the shape ate the margin the "
+                         "placement needed.",
+    "Shape": "Would pass if square but fails even when perfectly placed: the shape alone is out of tolerance.",
+    "Both": "Placement alone and shape alone are each out of tolerance.",
+    "Height (Z)": "X and Y are in tolerance; the corner height (Z) is not.",
+}

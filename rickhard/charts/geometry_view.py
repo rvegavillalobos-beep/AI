@@ -3,6 +3,8 @@ the single-module drawing used by the passport."""
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -29,11 +31,31 @@ def _scale_note(text: str) -> dict:
                 text=text, font=dict(size=11, color=T.pal().ink["muted"]))
 
 
+def short_ids(ids, width: int = 12) -> list[str]:
+    """Compact legend labels: the last ``width`` characters of each Part ID
+    before the tail all IDs share (that is where serial numbers differ)."""
+    ids = [str(i) for i in ids]
+    if len(ids) < 2:
+        return [i if len(i) <= width + 2 else "…" + i[-width:] for i in ids]
+    suf = len(os.path.commonprefix([i[::-1] for i in ids]))
+    out = []
+    for i in ids:
+        end = max(len(i) - suf, min(width, len(i)))
+        start = max(0, end - width)
+        out.append(("…" if start > 0 else "") + i[start:end] + ("…" if end < len(i) else ""))
+    return out
+
+
 def outlines(df: pd.DataFrame, nominals: Nominals, limit: float, exaggeration: float = 1.0,
              focus_key: str | None = None, types: list[str] | None = None, title: str | None = None,
-             height: int = 680, status_filter: tuple = ("PASS", "FAIL", "INCOMPLETE")) -> go.Figure:
+             height: int = 680, status_filter: tuple = ("PASS", "FAIL", "INCOMPLETE"),
+             per_module: bool | None = None) -> go.Figure:
     """Every selected module drawn against the green nominal, deviations
-    magnified, tolerance zones around each nominal corner (original view)."""
+    magnified, tolerance zones around each nominal corner (original view).
+
+    With ``per_module`` (default: up to 60 modules) every module is its own
+    legend entry, grouped by status: click an entry to hide it, double-click
+    to show only that one."""
     P = T.pal()
     fig = go.Figure()
     if not types:
@@ -62,20 +84,34 @@ def outlines(df: pd.DataFrame, nominals: Nominals, limit: float, exaggeration: f
         if len(pts) < 2:
             continue
         xs, ys = polygon(pts)
-        groups[st].append((xs, ys, f"{r['PartID']} · Run {int(r['RunNum'])} · {r['Status']}"))
+        groups[st].append((xs, ys, f"{r['PartID']} · Run {int(r['RunNum'])} · {r['Status']}", r["PartID"],
+                           int(r["RunNum"])))
     style_ = {"PASS": (T.rgba(P.ink["muted"], 0.55), 1.0, "OK modules"),
               "INCOMPLETE": (T.rgba(T.STATUS["serious"], 0.85), 1.6, "Incomplete modules"),
               "FAIL": (T.rgba(P.status("FAIL"), 0.75), 1.6, "NOK modules")}
-    for st in ("PASS", "INCOMPLETE", "FAIL"):
+    n_mod = sum(len(v) for v in groups.values())
+    if per_module is None:
+        per_module = 0 < n_mod <= 60
+    labels = dict(zip([(it[3], it[4]) for v in groups.values() for it in v],
+                      short_ids([it[3] for v in groups.values() for it in v])))
+    for st in ("FAIL", "INCOMPLETE", "PASS"):
         items = groups[st]
         if not items:
             continue
+        color, width, name = style_[st]
+        if per_module:
+            for k, (xs, ys, lab, pid, run) in enumerate(items):
+                fig.add_trace(go.Scatter(
+                    x=xs, y=ys, mode="lines+markers", name=f"{labels[(pid, run)]} · R{run}", legendgroup=st,
+                    legendgrouptitle_text=f"{name} ({len(items)})" if k == 0 else None,
+                    line=dict(color=color, width=width), marker=dict(size=4, color=color),
+                    hovertext=[lab] * len(xs), hoverinfo="text"))
+            continue
         X, Y, txt = [], [], []
-        for xs, ys, lab in items:
+        for xs, ys, lab, _, _ in items:
             X += list(xs) + [None]
             Y += list(ys) + [None]
             txt += [lab] * len(xs) + [None]
-        color, width, name = style_[st]
         fig.add_trace(go.Scatter(x=X, y=Y, mode="lines+markers", name=f"{name} ({len(items)})",
                                  line=dict(color=color, width=width), marker=dict(size=4, color=color),
                                  hovertext=txt, hoverinfo="text"))
@@ -98,7 +134,13 @@ def outlines(df: pd.DataFrame, nominals: Nominals, limit: float, exaggeration: f
     fig.update_yaxes(title_text="Global Y (mm)", autorange="reversed", scaleanchor="x", scaleratio=1)
     if exaggeration != 1:
         fig.add_annotation(**_scale_note(f"deviations ×{exaggeration:g} · boxes = ±{limit:g} mm (scaled)"))
-    return T.style(fig, height=height, title=title)
+    T.style(fig, height=height, title=title)
+    if per_module:
+        fig.update_layout(legend=dict(orientation="v", x=1.01, xanchor="left", y=1, yanchor="top",
+                                      font=dict(size=10), groupclick="toggleitem", tracegroupgap=8,
+                                      itemclick="toggle", itemdoubleclick="toggleothers"),
+                          margin=dict(t=12))
+    return fig
 
 
 def drift_movie(first: pd.DataFrame, nominals: Nominals, bat_type: str, limit: float,

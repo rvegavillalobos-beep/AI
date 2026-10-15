@@ -200,6 +200,28 @@ def fpy_vs_yaw(df: pd.DataFrame, dx: float, dy: float, yaws, limit: float, nomin
     return inside.sum(axis=1) / n * 100
 
 
+def best_fpy_by_yaw(df: pd.DataFrame, yaws, limit: float, nominals: Nominals, center=(0.0, 0.0),
+                    half: float = 2.5, step: float = 0.05) -> np.ndarray:
+    """Exact best FPY (%) reachable at each yaw when X / Y are re-optimised
+    on a grid around ``center``."""
+    yaws = np.asarray(yaws, float)
+    if not len(df):
+        return np.full(len(yaws), np.nan)
+    ax, ay, rx, ry = _rel_positions(df, nominals)
+    if len(ax) == 0:
+        return np.zeros(len(yaws))
+    n = len(df)
+    gx = np.arange(center[0] - half, center[0] + half + step / 2, step)
+    gy = np.arange(center[1] - half, center[1] + half + step / 2, step)
+    lo_x, hi_x, lo_y, hi_y = _bounds(ax, ay, rx, ry, yaws, limit)
+    out = np.empty(len(yaws))
+    for i in range(len(yaws)):
+        px = _pass_prob(lo_x[i], hi_x[i], gx, 0.0)
+        py = _pass_prob(lo_y[i], hi_y[i], gy, 0.0)
+        out[i] = float((px.T @ py).max()) / n * 100
+    return out
+
+
 # ---------------------------------------------------------------------------
 # All methods at once
 # ---------------------------------------------------------------------------

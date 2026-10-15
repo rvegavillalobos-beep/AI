@@ -229,7 +229,17 @@ def shape_link(sq_first: pd.DataFrame, diag_tol: float) -> dict:
         out["nok_if_square"] = int((fail & pis).sum())
         out["fpy_if_square"] = float(pis.mean() * 100)
     if "PassIfPlaced" in d:
-        out["fpy_if_placed"] = float(d["PassIfPlaced"].to_numpy(bool).mean() * 100)
+        pip = d["PassIfPlaced"].to_numpy(bool)
+        out["fpy_if_placed"] = float(pip.mean() * 100)
+        out["shape_alone"] = int((fail & ~pip).sum())    # fail from their shape whatever the placement
+    if "ShapeMax" in d:
+        shape = d["ShapeMax"].to_numpy(float)
+        out["shape_median"] = float(np.nanmedian(shape)) if np.isfinite(shape).any() else float("nan")
+        out["shape_median_fail"] = float(np.nanmedian(shape[fail])) if np.isfinite(shape[fail]).any() else float("nan")
+        out["shape_median_pass"] = float(np.nanmedian(shape[~fail])) if np.isfinite(shape[~fail]).any() else float("nan")
+    if "NokCause" in d:
+        causes = d[fail & (d["NokCause"] != "").to_numpy()]
+        out["causes"] = causes.groupby(["BatteryType", "NokCause"]).size().unstack(fill_value=0)
     bands = pd.cut(d["DeltaDiag"], DIAG_BANDS, right=False)
     by_band = (d.assign(Band=bands, Fail=fail).groupby("Band", observed=True)
                .agg(N=("Fail", "size"), Fails=("Fail", "sum")).reset_index())

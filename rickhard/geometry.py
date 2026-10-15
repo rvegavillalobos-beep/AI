@@ -288,7 +288,7 @@ def failure_mechanism(df: pd.DataFrame, limit: float, nominals: Nominals) -> pd.
     n = len(df)
     out = pd.DataFrame(index=df.index)
     if not n:
-        for c in ("Mechanism", "MechanismDetail"):
+        for c in ("Mechanism", "MechanismDetail", "NokCause"):
             out[c] = pd.Series(dtype=object)
         for c in ("ShareShift", "ShareYaw", "ShareShape"):
             out[c] = pd.Series(dtype=float)
@@ -339,8 +339,13 @@ def failure_mechanism(df: pd.DataFrame, limit: float, nominals: Nominals) -> pd.
     out["ShareShift"] = np.where(nok & complete, sh_shift, np.nan)
     out["ShareYaw"] = np.where(nok & complete, sh_yaw, np.nan)
     out["ShareShape"] = np.where(nok & complete, sh_shape, np.nan)
-    out["PassIfPlaced"] = np.where(complete, ok(S), False)        # perfect placement, own shape
-    out["PassIfSquare"] = np.where(complete, ok(D - S), False)    # own placement, perfect shape
+    pip = np.where(complete, ok(S), False)        # perfect placement, own shape
+    pis = np.where(complete, ok(D - S), False)    # own placement, perfect shape
+    out["PassIfPlaced"] = pip
+    out["PassIfSquare"] = pis
+    out["NokCause"] = np.select(
+        [~nok | ~complete, mech == "Height (Z)", pis & pip, pis & ~pip, ~pis & pip],
+        ["", "Height (Z)", "Shape + placement", "Shape", "Placement"], default="Both")
     return out
 
 

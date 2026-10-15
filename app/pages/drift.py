@@ -33,8 +33,13 @@ with left:
                                                      "its weekly average (path). Y points down, as on the line.")
     ui.chart(cd.centroid_path(recent, split), "dr_path")
 with right:
-    ui.section("Drift magnitude and yaw")
-    ui.chart(cd.magnitude_yaw(vec[vec["WeekKey"].isin(valid_weeks)]), "dr_magyaw")
+    ui.section("Weekly median offset and yaw", "Median of the module centre offset (X, Y) and of the yaw, week by "
+                                               "week and per battery type — what a median-based correction would "
+                                               "have chased each week.")
+    ui.chart(cd.weekly_medians(vec[vec["WeekKey"].isin(valid_weeks)]), "dr_medians")
+
+ui.section("Drift magnitude and yaw of every module")
+ui.chart(cd.magnitude_yaw(vec[vec["WeekKey"].isin(valid_weeks)], height=480), "dr_magyaw")
 
 # ---- Placement over time with change points ---------------------------------------------------
 ui.section("Placement over time and detected process shifts",

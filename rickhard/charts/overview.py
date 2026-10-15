@@ -32,16 +32,16 @@ def weekly_fpy(weekly: pd.DataFrame, target: float, ma_window: int, show_incompl
                              hovertemplate=f"MA{ma_window}: %{{y:.1f}}%<extra></extra>"), row=1, col=1)
     low = w["LowSample"].to_numpy(bool)
     fig.add_trace(go.Scatter(
-        x=x, y=w["PassRate"], mode="lines+markers", name="Weekly FPY",
+        x=x, y=w["PassRate"], mode="lines+markers+text", name="Weekly FPY",
         line=dict(color=P.accent, width=2.5),
         marker=dict(size=9, color=[P.ink["surface"] if lo else P.accent for lo in low],
                     line=dict(color=P.accent, width=2)),
+        text=[f"{v:.0f}%{'*' if lo else ''}" for v, lo in zip(w["PassRate"], low)], textposition="top center",
+        textfont=dict(size=10, color=P.ink["secondary"]), cliponaxis=False,
         customdata=np.stack([w["Total"], w["Passed"], w["Failed"], w["CI_lo"], w["CI_hi"]], axis=1),
         hovertemplate=("<b>%{x}</b><br>FPY %{y:.1f}%  (CI %{customdata[3]:.0f}–%{customdata[4]:.0f}%)"
                        "<br>%{customdata[1]} OK · %{customdata[2]} NOK of %{customdata[0]}<extra></extra>")),
         row=1, col=1)
-    fig.add_annotation(x=x[-1], y=float(w["PassRate"].iloc[-1]), text=f"<b>{w['PassRate'].iloc[-1]:.1f}%</b>",
-                       showarrow=False, xanchor="left", xshift=8, font=dict(size=12), row=1, col=1)
     T.hline(fig, target, P.target, "dot", 2, f"Target {target:.0f}%", "top left", row=1, col=1)
     lo_y = max(0.0, min(float(np.nanmin(w["CI_lo"])), target) - 8)
     fig.update_yaxes(title_text="FPY", range=[lo_y, 103], row=1, col=1, ticksuffix="%")
@@ -60,15 +60,16 @@ def weekly_fpy(weekly: pd.DataFrame, target: float, ma_window: int, show_incompl
             T.event_marks(fig, ev["CalendarWeek"], ev["Title"], rows=[1, 2], max_chars=20)
     if low.any():
         fig.add_annotation(x=1, y=-0.02, xref="paper", yref="paper", xanchor="right", yanchor="top",
-                           text="hollow points: weeks with fewer than 5 modules", showarrow=False,
+                           text="* and hollow points: weeks with fewer than 5 modules", showarrow=False,
                            font=dict(size=10, color=P.ink["muted"]))
     fig.update_xaxes(type="category", row=1, col=1)
     fig.update_xaxes(type="category", row=2, col=1)
     return T.style(fig, height=height, title=title, margin=dict(b=24))
 
 
-def status_by_type(first: pd.DataFrame, title: str | None = None, height: int = 300) -> go.Figure:
-    """Share of OK / incomplete / NOK per battery type (first runs)."""
+def status_by_type(first: pd.DataFrame, title: str | None = None, height: int | None = None) -> go.Figure:
+    """Share of OK / incomplete / NOK per battery type (first runs), plus an
+    'All types' bar; row labels carry the totals so nobody adds up segments."""
     P = T.pal()
     if first.empty:
         return T.empty("No modules.")
@@ -76,26 +77,29 @@ def status_by_type(first: pd.DataFrame, title: str | None = None, height: int = 
     for s in ("PASS", "INCOMPLETE", "FAIL"):
         if s not in t:
             t[s] = 0
+    if len(t) > 1:
+        t.loc["All types"] = t.sum()
     tot = t.sum(axis=1)
     pct = t.div(tot, axis=0) * 100
+    ylab = [f"<b>{i}</b><br>{int(n):,} modules" for i, n in zip(t.index, tot)]
     fig = go.Figure()
     for s, label in (("PASS", "OK"), ("INCOMPLETE", "Incomplete"), ("FAIL", "NOK")):
         if t[s].sum() == 0 and s == "INCOMPLETE":
             continue
         last = s == "FAIL"  # the last segment: its label goes outside the bar, readable however thin it is
         fig.add_trace(go.Bar(
-            y=pct.index, x=pct[s], orientation="h", name=label, marker_color=P.status(s),
+            y=ylab, x=pct[s], orientation="h", name=label, marker_color=P.status(s),
             marker_line=dict(width=1.5, color=P.ink["surface"]),
-            text=[f"{p:.1f}%" if (last or p >= 12) else "" for p in pct[s]],
+            text=[f"{p:.1f}% ({int(n):,})" if (last or p >= 16) else "" for p, n in zip(pct[s], t[s])],
             textposition="outside" if last else "inside", textangle=0, cliponaxis=False,
             insidetextanchor="middle",
             textfont=dict(color=P.status(s) if last else "#ffffff", size=12),
             customdata=np.stack([t[s], tot], axis=1),
-            hovertemplate=f"<b>%{{y}}</b><br>{label}: %{{x:.1f}}% (%{{customdata[0]}} of %{{customdata[1]}})<extra></extra>"))
-    fig.update_layout(barmode="stack", bargap=0.45)
-    fig.update_xaxes(range=[0, 114], tickvals=[0, 25, 50, 75, 100], ticksuffix="%", title_text="Share of first runs")
+            hovertemplate=f"%{{y}}<br>{label}: %{{x:.1f}}% (%{{customdata[0]}} of %{{customdata[1]}})<extra></extra>"))
+    fig.update_layout(barmode="stack", bargap=0.4)
+    fig.update_xaxes(range=[0, 124], tickvals=[0, 25, 50, 75, 100], ticksuffix="%", title_text="Share of first runs")
     fig.update_yaxes(autorange="reversed")
-    return T.style(fig, height=height, title=title)
+    return T.style(fig, height=height or 120 + 62 * len(t), title=title)
 
 
 def mechanisms(mech: pd.DataFrame, title: str | None = None, height: int = 300) -> go.Figure:

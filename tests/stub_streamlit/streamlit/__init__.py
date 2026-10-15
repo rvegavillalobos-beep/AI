@@ -145,6 +145,10 @@ class DeltaGenerator:
         assert isinstance(body, str)
         LOG.append(("markdown", body))
 
+    def badge(self, label, *, icon=None, color="blue", width="content", help=None):
+        assert color in ("red", "orange", "yellow", "blue", "green", "violet", "gray", "grey", "rainbow", "primary"), color
+        LOG.append(("badge", str(label)))
+
     def caption(self, body, unsafe_allow_html=False, *, help=None, width="stretch"):
         assert isinstance(body, str)
         LOG.append(("caption", body))
