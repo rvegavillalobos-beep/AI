@@ -1,0 +1,14 @@
+line-length = 140
+target-version = "py311"
+extend-exclude = ["tests/original_reference.py"]
+
+[lint]
+select = ["E", "F", "W", "B", "BLE", "UP", "I"]
+ignore = [
+    "B008",  # frozen dataclass defaults are fine
+    "B905",  # zip() over arrays of equal length by construction
+    "B023",  # helper closures are called within the loop iteration that defines them
+]
+
+[lint.isort]
+known-first-party = ["rickhard", "app", "helpers", "original_reference"]

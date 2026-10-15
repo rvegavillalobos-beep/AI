@@ -30,8 +30,7 @@ from scipy.special import ndtr
 
 from .config import Nominals, normalize_type
 from .constants import DEV_COLS
-from .geometry import (add_vectors, apply_compensation, corner_offsets, dev_matrix, evaluate_status, rel_nominal,
-                       with_deviations)
+from .geometry import add_vectors, apply_compensation, corner_offsets, dev_matrix, evaluate_status, rel_nominal, with_deviations
 
 METHODS = ("No compensation", "Median-based", "Rigid fit (mean)", "Robust optimum")
 

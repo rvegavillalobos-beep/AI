@@ -8,7 +8,6 @@ import pandas as pd
 from .constants import BATTERY_TYPES, CORNERS, DEV_COLS, MECHANISMS
 from .stats import cpk_ci, fisher_2x2, normal_tail_ppm, wilson
 
-
 # ---------------------------------------------------------------------------
 # First runs and FPY
 # ---------------------------------------------------------------------------

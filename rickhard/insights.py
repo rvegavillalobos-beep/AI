@@ -14,7 +14,7 @@ import pandas as pd
 
 from . import compensation as comp
 from . import improvement as imp
-from . import patterns
+from . import metrics, patterns, remeasure, spc
 from .analysis import Analysis
 from .constants import MODE_LABELS
 from .stats import fisher_2x2, significance_label
@@ -344,3 +344,34 @@ def generate(a: Analysis, extras: dict | None = None) -> tuple[list[Insight], li
             actions.append(Action(label, "What-if simulation on your modules", gain, owner, page))
     actions.sort(key=lambda x: -(x.impact if x.impact is not None and np.isfinite(x.impact) else -1))
     return out, actions
+
+
+def bundle(a: Analysis, health: dict | None = None, *, alarms: pd.DataFrame | None = None,
+           change_points: pd.DataFrame | None = None, remeasure_summary: dict | None = None) -> dict:
+    """Findings, action plan and the evidence behind them for one analysis.
+
+    The optional arguments let a caller pass pieces it has already computed
+    (the app caches them); anything missing is computed here.
+    """
+    f = a.first
+    rules = a.settings.rules
+    extras: dict = {"health": health or {}}
+    extras["placement"] = placement_suggestions(a)
+    extras["budget"] = imp.budget(f)
+    extras["shape_link"] = metrics.shape_link(a.sq_first, rules.diag_tol)
+    if alarms is None:
+        alarms = spc.alarm_board(f, {**spc.PLACEMENT_VARS, "WorstAbs": "Worst corner |dev|"}, recent_days=14)
+    extras["alarms"] = alarms
+    if change_points is None:
+        change_points = spc.placement_change_points(f)["table"]
+    extras["change_points"] = change_points
+    extras["shift_effect"] = shift_effect(f)
+    extras["startup"] = patterns.startup_effect(f, patterns.suggest_stop_gap(f))
+    if remeasure_summary is None:
+        pairs = remeasure.run_pairs(a.runs)
+        remeasure_summary = remeasure.summary(pairs, remeasure.repeatability(pairs, rules.spec_limit, 120.0))
+    extras["remeasure"] = remeasure_summary
+    comps = {t: s["setting"] for t, s in extras["placement"].items()}
+    extras["levers"] = lever_gains(a, comps)
+    ins, acts = generate(a, extras)
+    return {"insights": ins, "actions": acts, "extras": extras, "comps": comps}

@@ -18,8 +18,8 @@ import datetime
 import io
 import re
 import warnings
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Iterable, Sequence
 
 import numpy as np
 import pandas as pd

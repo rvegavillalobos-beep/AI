@@ -14,7 +14,6 @@ import numpy as np
 
 from .constants import BATTERY_TYPES, CORNERS, DEFAULT_NOMINALS
 
-
 # ---------------------------------------------------------------------------
 # Loading
 # ---------------------------------------------------------------------------
@@ -106,7 +105,7 @@ class Nominals:
     table: tuple = field(default_factory=lambda: _freeze_nominals(DEFAULT_NOMINALS))
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Nominals":
+    def from_dict(cls, d: dict) -> Nominals:
         merged = {t: dict(DEFAULT_NOMINALS[t]) for t in BATTERY_TYPES}
         for t, corners in (d or {}).items():
             if t in merged:
@@ -140,7 +139,7 @@ class Settings:
     nominals: Nominals = field(default_factory=Nominals)
     shifts: ShiftPlan = field(default_factory=ShiftPlan)
 
-    def with_rules(self, **kw) -> "Settings":
+    def with_rules(self, **kw) -> Settings:
         return replace(self, rules=replace(self.rules, **kw))
 
 

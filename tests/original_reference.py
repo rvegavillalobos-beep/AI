@@ -472,3 +472,62 @@ def original_pipeline(uploaded_file, spec_limit=3.0, exclude_incomplete=True):
             pd.DataFrame(first_run_records) if first_run_records else pd.DataFrame(columns=df_summary.columns)
         )
     return df_raw, df_summary, df_analysis, df_first_valid
+
+
+def original_squareness(df_analysis, max_diag_tol=1.5):
+    """The original Squareness tab loop (verbatim, Streamlit calls removed)."""
+    squareness_records = []
+    for _, row in df_analysis.iterrows():
+        if pd.isna(row["FL_X"]) or pd.isna(row["FR_X"]) or pd.isna(row["RL_X"]) or pd.isna(row["RR_X"]):
+            continue
+
+        nom = get_nominal_coordinates(row["BatteryType"])
+
+        d1_nom = np.sqrt((nom["RR_X"] - nom["FL_X"]) ** 2 + (nom["RR_Y"] - nom["FL_Y"]) ** 2)
+        d2_nom = np.sqrt((nom["RL_X"] - nom["FR_X"]) ** 2 + (nom["RL_Y"] - nom["FR_Y"]) ** 2)
+        w_top_nom = np.sqrt((nom["FR_X"] - nom["FL_X"]) ** 2 + (nom["FR_Y"] - nom["FL_Y"]) ** 2)
+        w_bot_nom = np.sqrt((nom["RR_X"] - nom["RL_X"]) ** 2 + (nom["RR_Y"] - nom["RL_Y"]) ** 2)
+        l_left_nom = np.sqrt((nom["RL_X"] - nom["FL_X"]) ** 2 + (nom["RL_Y"] - nom["FL_Y"]) ** 2)
+        l_right_nom = np.sqrt((nom["RR_X"] - nom["FR_X"]) ** 2 + (nom["RR_Y"] - nom["FR_Y"]) ** 2)
+
+        angle_fl_nom = calculate_corner_angle(
+            (nom["FL_X"], nom["FL_Y"]), (nom["FR_X"], nom["FR_Y"]), (nom["RL_X"], nom["RL_Y"])
+        )
+
+        fl_x_act = nom["FL_X"] + row["FL_X"]
+        fl_y_act = nom["FL_Y"] + row["FL_Y"]
+        fr_x_act = nom["FR_X"] + row["FR_X"]
+        fr_y_act = nom["FR_Y"] + row["FR_Y"]
+        rl_x_act = nom["RL_X"] + row["RL_X"]
+        rl_y_act = nom["RL_Y"] + row["RL_Y"]
+        rr_x_act = nom["RR_X"] + row["RR_X"]
+        rr_y_act = nom["RR_Y"] + row["RR_Y"]
+
+        d1_act = np.sqrt((rr_x_act - fl_x_act) ** 2 + (rr_y_act - fl_y_act) ** 2)
+        d2_act = np.sqrt((rl_x_act - fr_x_act) ** 2 + (rl_y_act - fr_y_act) ** 2)
+        w_top_act = np.sqrt((fr_x_act - fl_x_act) ** 2 + (fr_y_act - fl_y_act) ** 2)
+        w_bot_act = np.sqrt((rr_x_act - rl_x_act) ** 2 + (rr_y_act - rl_y_act) ** 2)
+        l_left_act = np.sqrt((rl_x_act - fl_x_act) ** 2 + (rl_y_act - fl_y_act) ** 2)
+        l_right_act = np.sqrt((rr_x_act - fr_x_act) ** 2 + (rr_y_act - fr_y_act) ** 2)
+
+        angle_fl_act = calculate_corner_angle(
+            (fl_x_act, fl_y_act), (fr_x_act, fr_y_act), (rl_x_act, rl_y_act)
+        )
+
+        delta_diags = abs((d1_act - d2_act) - (d1_nom - d2_nom))
+        diff_ancho = (w_top_act - w_top_nom) - (w_bot_act - w_bot_nom)
+        diff_largo = (l_left_act - l_left_nom) - (l_right_act - l_right_nom)
+        angle_fl_dev = angle_fl_act - angle_fl_nom
+
+        status, detail = evaluate_deformation(delta_diags, angle_fl_dev, diff_ancho, diff_largo, max_diag_tol)
+
+        squareness_records.append({
+            "Date (MX)": row["Date"], "CalendarWeek": row["CalendarWeek"], "PartID": row["PartID"],
+            "RunNum": row["RunNum"], "BatteryType": row["BatteryType"],
+            "Diag 1 [mm]": round(d1_act, 2), "Diag 2 [mm]": round(d2_act, 2),
+            "Delta Diag [mm]": round(delta_diags, 2), "Width Delta [mm]": round(diff_ancho, 2),
+            "Length Delta [mm]": round(diff_largo, 2), "FL Angular Dev [°]": round(angle_fl_dev, 2),
+            "Squareness Status": status, "Root Cause Details": detail,
+        })
+
+    return pd.DataFrame(squareness_records)

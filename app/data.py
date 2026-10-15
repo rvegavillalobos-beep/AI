@@ -15,8 +15,8 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from rickhard import analysis, compensation, demo, events as ev_mod, improvement, insights, loading
-from rickhard import metrics, patterns, remeasure, spc
+from rickhard import analysis, compensation, demo, improvement, insights, loading, remeasure, spc
+from rickhard import events as ev_mod
 from rickhard.analysis import Analysis
 from rickhard.config import LoadOptions, Scope, Settings
 from rickhard.loading import Dataset
@@ -33,7 +33,7 @@ def _code_version() -> str:
 
 
 CODE_VERSION = _code_version()
-PLACEMENT_VARS = {"Fit_Tx": "Shift X", "Fit_Ty": "Shift Y", "Fit_Rot": "Yaw"}
+PLACEMENT_VARS = spc.PLACEMENT_VARS
 
 
 # ---------------------------------------------------------------------------
@@ -134,20 +134,7 @@ def events_frame() -> pd.DataFrame:
 def change_points(key: str, _a: Analysis) -> dict:
     """Change points of the placement per type: {(type, col): [idx]}, the
     dates and a table."""
-    out: dict = {"idx": {}, "table": []}
-    for t, sub in _a.first.sort_values("Date").groupby("BatteryType"):
-        for col, label in PLACEMENT_VARS.items():
-            s = sub[["Date", col]].dropna()
-            if len(s) < 30:
-                continue
-            y = s[col].to_numpy(float)
-            cps = spc.change_points(y, min_size=max(12, len(y) // 40))
-            out["idx"][(t, col)] = cps
-            if cps:
-                out["table"].append(spc.describe_change_points(s["Date"], y, cps, f"{t} {label}"))
-    tab = pd.concat(out["table"], ignore_index=True) if out["table"] else pd.DataFrame(columns=spc.CP_COLUMNS)
-    out["table"] = tab
-    return out
+    return spc.placement_change_points(_a.first)
 
 
 @st.cache_data(max_entries=24, show_spinner=False)
@@ -167,24 +154,8 @@ def remeasure_bundle(key: str, max_gap: float, _a: Analysis) -> dict:
 
 @st.cache_data(max_entries=24, show_spinner="Reading the data for findings…")
 def insight_bundle(key: str, _a: Analysis, _ds: Dataset) -> dict:
-    f = _a.first
-    rules = _a.settings.rules
-    extras: dict = {"health": _ds.health}
-    extras["placement"] = insights.placement_suggestions(_a)
-    extras["budget"] = improvement.budget(f)
-    extras["shape_link"] = metrics.shape_link(_a.sq_first, rules.diag_tol)
-    extras["alarms"] = alarms(key, 14, _a)
-    cp = change_points(key, _a)
-    extras["change_points"] = cp["table"]
-    extras["shift_effect"] = insights.shift_effect(f)
-    gap = patterns.suggest_stop_gap(f)
-    extras["startup"] = patterns.startup_effect(f, gap)
-    rb = remeasure_bundle(key, 120.0, _a)
-    extras["remeasure"] = rb["summary"]
-    comps = {t: s["setting"] for t, s in extras["placement"].items()}
-    extras["levers"] = insights.lever_gains(_a, comps)
-    ins, acts = insights.generate(_a, extras)
-    return {"insights": ins, "actions": acts, "extras": extras, "comps": comps}
+    return insights.bundle(_a, _ds.health, alarms=alarms(key, 14, _a), change_points=change_points(key, _a)["table"],
+                           remeasure_summary=remeasure_bundle(key, 120.0, _a)["summary"])
 
 
 @st.cache_data(max_entries=48, show_spinner="Searching the best compensation…")

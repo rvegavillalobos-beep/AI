@@ -112,7 +112,8 @@ def mode_trends(wm: pd.DataFrame, bat_type: str, modes: list[str], title: str | 
                                  marker=dict(size=8, color=line_color, line=dict(color=P.ink["surface"], width=2)),
                                  customdata=np.stack([sd, d["N"]], axis=1),
                                  hovertemplate="<b>%{x}</b> · " + MODE_LABELS[m]
-                                               + "<br>mean %{y:+.3f} mm · σ %{customdata[0]:.3f}<br>%{customdata[1]} modules<extra></extra>"))
+                                               + "<br>mean %{y:+.3f} mm · σ %{customdata[0]:.3f}"
+                                               + "<br>%{customdata[1]} modules<extra></extra>"))
     T.hline(fig, 0, P.ink["axis"], "solid", 1, None)
     fig.update_xaxes(type="category")
     fig.update_yaxes(title_text="Mode amplitude (mm at the corners)")

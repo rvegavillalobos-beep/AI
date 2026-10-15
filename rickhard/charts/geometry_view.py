@@ -10,8 +10,8 @@ import plotly.graph_objects as go
 from ..config import Nominals
 from ..constants import CORNERS
 from ..geometry import polygon
-from .corners import ellipse
 from . import theme as T
+from .corners import ellipse
 
 
 def _tol_boxes(fig, nom: dict, half: float, color, name="Tolerance zone"):

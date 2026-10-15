@@ -218,6 +218,39 @@ def describe_change_points(dates, y, cps: list[int], variable: str) -> pd.DataFr
     return pd.DataFrame(rows, columns=CP_COLUMNS)
 
 
+PLACEMENT_VARS = {"Fit_Tx": "Shift X", "Fit_Ty": "Shift Y", "Fit_Rot": "Yaw"}
+
+
+def placement_change_points(first: pd.DataFrame, variables: dict[str, str] | None = None,
+                            min_points: int = 30) -> dict:
+    """Change points of the placement per battery type.
+
+    Returns ``{"idx": {(type, column): [index, ...]}, "table": DataFrame}``;
+    indices refer to the type's first runs sorted by date with the variable
+    present.
+    """
+    variables = variables or PLACEMENT_VARS
+    out: dict = {"idx": {}, "table": []}
+    if not len(first):
+        out["table"] = pd.DataFrame(columns=CP_COLUMNS)
+        return out
+    for t, sub in first.sort_values("Date").groupby("BatteryType"):
+        for col, label in variables.items():
+            if col not in sub.columns:
+                continue
+            s = sub[["Date", col]].dropna()
+            if len(s) < min_points:
+                continue
+            y = s[col].to_numpy(float)
+            cps = change_points(y, min_size=max(12, len(y) // 40))
+            out["idx"][(t, col)] = cps
+            if cps:
+                out["table"].append(describe_change_points(s["Date"], y, cps, f"{t} {label}"))
+    out["table"] = (pd.concat(out["table"], ignore_index=True) if out["table"]
+                    else pd.DataFrame(columns=CP_COLUMNS))
+    return out
+
+
 def segment_means(y, cps: list[int]) -> np.ndarray:
     y = np.asarray(y, float)
     out = np.full(len(y), np.nan)
