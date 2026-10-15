@@ -41,8 +41,10 @@ with left:
         t = st.segmented_control("Battery type", types, key="p_z_type") or types[0]
     else:
         t = types[0]
-    ui.section(f"Average surface · {t}", "Fitted through the mean corner heights (exact for four corners); the "
-                                        "vertical scale is exaggerated.")
+    ui.section(f"Average surface · {t}", "Top view of the average module: colour = height Z of the surface fitted "
+                                        "through the mean corner heights (exact for four corners), labels = mean Z "
+                                        "of each corner. A colour gradient from front to rear is pitch, from left to "
+                                        "right is roll; opposite corners pulling the same way is twist.")
     ui.chart(cm.z_surface(zheight.mean_surface(f, t, c.nominals), t), "z_surf")
 with right:
     ui.section("Z per corner")

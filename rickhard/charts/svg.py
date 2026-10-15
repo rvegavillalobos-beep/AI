@@ -43,13 +43,13 @@ def _arrow(x1, y1, x2, y2, color, width=2.5, head=9.0) -> str:
 
 
 def work_instruction_svg(bat_type: str, dx: float, dy: float, yaw: float, nominals: Nominals,
-                         magnify: float = 150.0, width: int = 640, height: int = 380) -> str:
+                         magnify: float = 150.0, width: int = 640, height: int = 520) -> str:
     """Top view of the module: where each corner must go (magnified)."""
     P = T.pal()
     rx, ry = rel_nominal(bat_type, nominals)
     cx, cy = rigid_transform(rx, ry, 0.0, 0.0, dx, dy, yaw)
     ox, oy = cx - rx, cy - ry                       # per-corner offsets (mm)
-    pad_x, pad_y = 48, 70
+    pad_x, pad_y = 48, 78
     span_x = float(rx.max() - rx.min())
     span_y = float(ry.max() - ry.min())
     s = min((width - 2 * pad_x) / span_x, (height - 2 * pad_y) / span_y)
@@ -98,7 +98,7 @@ def work_instruction_svg(bat_type: str, dx: float, dy: float, yaw: float, nomina
         right = rx[i] > 0  # labels point inwards so they never leave the drawing
         tx = p0[0] + (-12 if right else 12)
         anchor = "end" if right else "start"
-        ty = p0[1] + (-18 if ry[i] < 0 else 44)
+        ty = p0[1] + (-26 if ry[i] < 0 else 46)
         parts.append(f'<text x="{tx:.1f}" y="{ty:.1f}" font-size="13" fill="{ink}" text-anchor="{anchor}">'
                      f'<tspan font-weight="700">{c}</tspan> X {ox[i]:+.2f} · Y {oy[i]:+.2f} mm</text>')
     parts.append(f'<text x="{width - 8}" y="{height - 8}" font-size="11" fill="{muted}" text-anchor="end">'

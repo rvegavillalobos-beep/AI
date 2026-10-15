@@ -88,39 +88,36 @@ def gap_hist(pairs: pd.DataFrame, max_gap: float, title: str | None = None, heig
 # Height (Z)
 # ---------------------------------------------------------------------------
 
-def z_surface(surf: dict, bat_type: str, title: str | None = None, height: int = 520) -> go.Figure:
-    """3D view of the average module surface with the four corners (Z is
-    exaggerated by the aspect ratio, values in the hover are real mm)."""
+def z_surface(surf: dict, bat_type: str, title: str | None = None, height: int = 420) -> go.Figure:
+    """Top view of the average module surface: colour = fitted height Z,
+    with the mean Z of each corner (same orientation as the outline plots)."""
     P = T.pal()
     if not surf:
         return T.empty("No Z data.")
     nom = surf["nominal"]
-    X, Y = np.meshgrid(surf["x"], surf["y"])
-    Z = surf["z"]
+    Z = np.asarray(surf["z"], float)
     zabs = max(0.05, float(np.nanmax(np.abs(Z))) * 1.1, max(abs(v) for v in surf["corner_z"].values()) * 1.1)
-    magnify = 1.0
-    fig = go.Figure()
-    fig.add_trace(go.Surface(x=X, y=Y, z=Z, colorscale=P.diverging, cmin=-zabs, cmax=zabs,
-                             colorbar=dict(title="Z (mm)", len=0.55, thickness=12), opacity=0.95,
-                             hovertemplate="X %{x:.0f} · Y %{y:.0f}<br>Z %{z:+.3f} mm<extra></extra>"))
+    fig = go.Figure(go.Contour(
+        x=surf["x"], y=surf["y"], z=Z, colorscale=P.diverging, zmin=-zabs, zmax=zabs, ncontours=14,
+        contours=dict(coloring="heatmap", showlabels=True, labelfont=dict(size=10, color=P.ink["secondary"])),
+        line=dict(width=0.6, color=T.rgba(P.ink["secondary"], 0.4)),
+        colorbar=dict(title="Z (mm)", thickness=12, len=0.8),
+        hovertemplate="X %{x:.0f} · Y %{y:.0f}<br>Z %{z:+.3f} mm<extra></extra>"))
+    xs, ys = polygon(nom)
+    fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines", line=dict(color=P.nominal, width=2, dash="dash"),
+                             name="Nominal outline", hoverinfo="skip", showlegend=False))
     cx = [nom[c][0] for c in CORNERS]
     cy = [nom[c][1] for c in CORNERS]
     cz = [surf["corner_z"][c] for c in CORNERS]
-    fig.add_trace(go.Scatter3d(x=cx, y=cy, z=[v * magnify for v in cz], mode="markers+text",
-                               text=[f"{c} {v:+.2f}" for c, v in zip(CORNERS, cz)], textposition="top center",
-                               marker=dict(size=6, color=P.type(bat_type)), hoverinfo="text", name="Corners (mean Z)"))
-    for (x0, y0), z0 in zip(zip(cx, cy), cz):
-        fig.add_trace(go.Scatter3d(x=[x0, x0], y=[y0, y0], z=[0, z0 * magnify], mode="lines",
-                                   line=dict(color=P.ink["muted"], width=4), hoverinfo="skip", showlegend=False))
-    xs, ys = polygon(nom)
-    fig.add_trace(go.Scatter3d(x=xs, y=ys, z=[0] * len(xs), mode="lines", line=dict(color=P.nominal, width=4),
-                               name="Nominal (Z = 0)", hoverinfo="skip"))
-    fig.update_layout(scene=dict(
-        xaxis_title="X (front →)", yaxis_title="Y", zaxis_title="Z (mm)",
-        zaxis=dict(range=[-zabs * 1.2, zabs * 1.2]),
-        yaxis=dict(autorange="reversed"), aspectmode="manual", aspectratio=dict(x=1.5, y=1.0, z=0.45),
-        camera=dict(eye=dict(x=-1.8, y=-2.0, z=1.05), center=dict(x=0, y=0, z=-0.08))))
-    return T.style(fig, height=height, title=title, legend_bottom=True, margin=dict(t=10, l=0, r=0))
+    fig.add_trace(go.Scatter(
+        x=cx, y=cy, mode="markers+text", text=[f"<b>{c}</b> {v:+.2f}" for c, v in zip(CORNERS, cz)],
+        textposition=["bottom left", "top left", "bottom right", "top right"], cliponaxis=False,
+        textfont=dict(size=12, color=P.ink["primary"]), marker=dict(size=10, color=P.type(bat_type),
+                                                                   line=dict(color=P.ink["surface"], width=2)),
+        hovertemplate="%{text} mm (mean corner Z)<extra></extra>", showlegend=False))
+    fig.update_xaxes(title_text="Global X (mm) — front →", showgrid=False)
+    fig.update_yaxes(title_text="Global Y (mm)", autorange="reversed", scaleanchor="x", scaleratio=1, showgrid=False)
+    return T.style(fig, height=height, title=title, legend=False)
 
 
 def z_box(first: pd.DataFrame, z_lim: tuple[float, float], title: str | None = None, height: int = 320) -> go.Figure:

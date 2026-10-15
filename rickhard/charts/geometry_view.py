@@ -136,9 +136,12 @@ def outlines(df: pd.DataFrame, nominals: Nominals, limit: float, exaggeration: f
         fig.add_annotation(**_scale_note(f"deviations ×{exaggeration:g} · boxes = ±{limit:g} mm (scaled)"))
     T.style(fig, height=height, title=title)
     if per_module:
-        fig.update_layout(legend=dict(orientation="v", x=1.01, xanchor="left", y=1, yanchor="top",
-                                      font=dict(size=10), groupclick="toggleitem", tracegroupgap=8,
-                                      itemclick="toggle", itemdoubleclick="toggleothers"),
+        # one entry per module, below the drawing so the drawing keeps the full width
+        rows = int(np.ceil((n_mod + 2 * len(types) + 3) / 5))
+        fig.update_layout(height=height + 20 * rows,
+                          legend=dict(orientation="h", x=0, xanchor="left", y=-0.1, yanchor="top", entrywidth=150,
+                                      font=dict(size=10), groupclick="toggleitem", itemclick="toggle",
+                                      itemdoubleclick="toggleothers"),
                           margin=dict(t=12))
     return fig
 

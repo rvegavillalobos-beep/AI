@@ -40,8 +40,10 @@ CSS = """
   .rx-scope {opacity: .68; font-size: .88rem; margin: -.55rem 0 1rem 0;}
   .rx-kpiwrap {container-type: inline-size;}
   .rx-kpis {display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 12px; margin: .2rem 0 1rem 0;}
-  @container (max-width: 900px) {.rx-kpis {grid-template-columns: repeat(var(--n2), minmax(0, 1fr));}}
-  @container (max-width: 540px) {.rx-kpis {grid-template-columns: repeat(2, minmax(0, 1fr));}}
+  @container (max-width: 1020px) {.rx-kpis.n6, .rx-kpis.n7, .rx-kpis.n8 {grid-template-columns: repeat(var(--n2), minmax(0, 1fr));}}
+  @container (max-width: 860px) {.rx-kpis.n5 {grid-template-columns: repeat(3, minmax(0, 1fr));}}
+  @container (max-width: 700px) {.rx-kpis.n4 {grid-template-columns: repeat(2, minmax(0, 1fr));}}
+  @container (max-width: 520px) {.rx-kpis {grid-template-columns: repeat(2, minmax(0, 1fr));}}
   @container (max-width: 300px) {.rx-kpis {grid-template-columns: minmax(0, 1fr);}}
   .rx-card {border: 1px solid rgba(128,128,128,.22); border-radius: 14px; padding: 14px 16px 12px 16px;
             background: rgba(128,128,128,.04); position: relative; overflow: hidden; min-width: 0;}
@@ -146,7 +148,8 @@ def kpi_cards(cards: list[dict]) -> None:
 
     One row when there is room, otherwise balanced rows (6 → 3 + 3, 5 → 3 + 2)."""
     n = max(1, len(cards))
-    out = [f"<div class='rx-kpiwrap'><div class='rx-kpis' style='--n:{n};--n2:{math.ceil(n / 2)}'>"]
+    # each card needs ~170 px: the row splits into balanced rows below n × 170 px (CSS container queries)
+    out = [f"<div class='rx-kpiwrap'><div class='rx-kpis n{min(n, 8)}' style='--n:{n};--n2:{math.ceil(n / 2)}'>"]
     for c in cards:
         color = {True: T.STATUS["good"], False: T.STATUS["critical"]}.get(c.get("good"), "inherit")
         arrow = ""

@@ -189,7 +189,8 @@ def style(fig: go.Figure, height: int | None = None, title: str | None = None, l
         if legend and not legend_bottom:
             fig.update_layout(margin=dict(t=max(m["t"], 64)), legend=dict(y=1.02))
     if legend and legend_bottom:
-        fig.update_layout(legend=dict(y=-0.08, yanchor="top"), margin=dict(b=max(m["b"], 64)))
+        # anchored to the bottom of the figure, under the tick labels and axis title
+        fig.update_layout(legend=dict(yref="container", y=0, yanchor="bottom"), margin=dict(b=max(m["b"], 92)))
     return fig
 
 

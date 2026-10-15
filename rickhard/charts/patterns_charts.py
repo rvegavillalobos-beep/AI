@@ -20,14 +20,17 @@ def fpy_by_group(t: pd.DataFrame, col: str, target: float | None = None, title: 
         x=labels, y=t["FPY"], marker_color=P.accent,
         error_y=dict(type="data", symmetric=False, array=(t["CI_hi"] - t["FPY"]).clip(lower=0),
                      arrayminus=(t["FPY"] - t["CI_lo"]).clip(lower=0), color=P.ink["secondary"], thickness=1.2, width=4),
-        text=[f"<b>{v:.1f}%</b><br>n={n}" for v, n in zip(t["FPY"], t["N"])] if few else None,
-        textposition="inside", insidetextanchor="start", textangle=0, textfont=dict(color="#ffffff"),
         customdata=np.stack([t["N"], t["CI_lo"], t["CI_hi"]], axis=1),
         hovertemplate="<b>%{x}</b><br>FPY %{y:.1f}% (95% CI %{customdata[1]:.0f}–%{customdata[2]:.0f}%)<br>"
                       "%{customdata[0]} modules<extra></extra>", showlegend=False))
     if target is not None:
         T.hline(fig, target, P.target, "dot", 2, f"Target {target:.0f}%", "top right")
     lo = max(0.0, float(np.nanmin(t["CI_lo"])) - 10)
+    if few:  # value and volume written near the foot of each bar (the axis does not start at 0)
+        fig.add_trace(go.Scatter(x=labels, y=[lo + (106 - lo) * 0.03] * len(labels), mode="text",
+                                 text=[f"<b>{v:.1f}%</b><br>n={n}" for v, n in zip(t["FPY"], t["N"])],
+                                 textposition="top center", textfont=dict(color="#ffffff", size=12),
+                                 hoverinfo="skip", showlegend=False))
     fig.update_yaxes(range=[lo, 106], ticksuffix="%", title_text="FPY")
     fig.update_xaxes(type="category", title_text=xlabel or col)
     if not few:

@@ -603,6 +603,7 @@ def build_dataset(files: Sequence[tuple[str, bytes]], opts: LoadOptions = LoadOp
     if has_z:
         zero &= df["Z"].fillna(0) == 0
     health["zero_readings"] = int(zero.sum())
+    health["zero_reading_features"] = df.loc[zero, "Feature"].astype(str).value_counts().head(10).to_dict()
     health["zero_as_missing"] = bool(opts.zero_as_missing)
     if opts.zero_as_missing and zero.any():
         df.loc[zero, ["X", "Y", "Z"]] = np.nan

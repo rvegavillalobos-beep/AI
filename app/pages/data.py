@@ -45,8 +45,10 @@ for pair in h.get("similar_part_ids", []):
                   f"Part IDs **{pair[0]}** and **{pair[1]}** differ only by letter O vs digit 0. "
                   + ("They are merged." if merged else "They are counted as two modules — merge them below.")))
 if h.get("zero_readings"):
+    zf = ", ".join(f"`{f}` ({n})" for f, n in h.get("zero_reading_features", {}).items())
     notes.append(("warn", "Failed reads",
-                  f"**{h['zero_readings']} reading(s) with X, Y (and Z) all exactly 0** — almost certainly failed reads. "
+                  f"**{h['zero_readings']} reading(s) with X, Y (and Z) all exactly 0**"
+                  + (f" ({zf})" if zf else "") + " — almost certainly failed reads, not perfect corners. "
                   + ("Treated as missing corners." if h["zero_as_missing"] else "Currently used as real measurements.")))
 if h.get("dst_ambiguous_rows") or h.get("dst_nonexistent_rows"):
     notes.append(("info", "Daylight-saving change",

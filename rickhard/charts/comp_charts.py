@@ -176,6 +176,7 @@ def weekly_real_vs_sim(sim: pd.DataFrame, title: str | None = None, height: int 
     fig.add_trace(go.Scatter(x=w["CalendarWeek"], y=w["Sim"], mode="lines+markers", name="Simulated FPY",
                              line=dict(color=P.accent, width=2.5), marker=dict(size=8, color=P.accent)))
     fig.update_xaxes(type="category")
+    T.thin_ticks(fig, w["CalendarWeek"].tolist(), max_ticks=8)
     lo = max(0.0, float(min(w["Real"].min(), w["Sim"].min())) - 8)
     fig.update_yaxes(range=[lo, 103], ticksuffix="%")
     return T.style(fig, height=height, title=title)

@@ -82,7 +82,7 @@ def nok_causes(causes: pd.DataFrame | None, title: str | None = None, height: in
     fig.update_layout(barmode="stack", bargap=0.45)
     fig.update_xaxes(range=[0, 100], ticksuffix="%", title_text="Share of NOK modules")
     fig.update_yaxes(autorange="reversed")
-    return T.style(fig, height=height, title=title, legend_bottom=True)
+    return T.style(fig, height=height, title=title)
 
 
 def failure_map(first: pd.DataFrame, limit: float, title: str | None = None, height: int = 470) -> go.Figure:
@@ -154,7 +154,10 @@ def weekly_deformation(wd: pd.DataFrame, title: str | None = None, height: int =
                                  customdata=np.stack([s["Deformed"], s["N"], s["MedianDiag"]], axis=1),
                                  hovertemplate=("<b>%{x}</b> · " + t + "<br>%{y:.1f}% deformed (%{customdata[0]} of "
                                                 "%{customdata[1]})<br>median ΔDiag %{customdata[2]:.2f} mm<extra></extra>")))
-    fig.update_xaxes(type="category")
+    weeks = wd.drop_duplicates("CalendarWeek").sort_values("WeekKey")["CalendarWeek"].tolist() \
+        if "WeekKey" in wd else list(dict.fromkeys(wd["CalendarWeek"]))
+    fig.update_xaxes(type="category", categoryorder="array", categoryarray=weeks)
+    T.thin_ticks(fig, weeks, max_ticks=8)
     fig.update_yaxes(title_text="Deformed", ticksuffix="%", rangemode="tozero")
     return T.style(fig, height=height, title=title)
 

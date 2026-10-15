@@ -38,7 +38,7 @@ def budget_bars(bud: pd.DataFrame, bat_type: str, title: str | None = None, heig
         hovertemplate="<b>%{y}</b><br>σ %{x:.3f} mm<br>%{customdata:.1f}% of the variance<extra></extra>"),
         row=1, col=2)
     bmax = float(np.nanmax(np.abs(b["Bias"]))) * 1.9 + 0.05
-    fig.update_xaxes(range=[-bmax, bmax], zeroline=True, row=1, col=1)
+    fig.update_xaxes(range=[-bmax, bmax], zeroline=True, nticks=5, row=1, col=1)
     fig.update_xaxes(range=[0, float(np.nanmax(b["SD"])) * 1.6 + 0.02], row=1, col=2)
     fig.update_yaxes(autorange="reversed", row=1, col=1)
     for fam in ("Placement", "Size", "Shape"):
@@ -130,23 +130,29 @@ def pca_components(p: dict, bat_type: str, nominals: Nominals, magnify: float = 
     nx, ny = polygon(nom)
     titles = [f"<b>PC{c['k']} · {c['share']:.0f}%</b><br><span style='font-size:11px'>"
               f"{c['label'].replace(' + ', '<br>')}</span>" for c in comps]
-    fig = make_subplots(rows=1, cols=len(comps), subplot_titles=titles, horizontal_spacing=0.03)
+    ncol = 2 if len(comps) == 4 else len(comps)
+    nrow = int(np.ceil(len(comps) / ncol))
+    fig = make_subplots(rows=nrow, cols=ncol, subplot_titles=titles, horizontal_spacing=0.08,
+                        vertical_spacing=0.25 if nrow > 1 else 0.0)
     for i, c in enumerate(comps, start=1):
+        row, col = (i - 1) // ncol + 1, (i - 1) % ncol + 1
         fig.add_trace(go.Scatter(x=nx, y=ny, mode="lines", line=dict(color=P.ink["muted"], width=1.2, dash="dash"),
-                                 hoverinfo="skip", showlegend=False), row=1, col=i)
+                                 hoverinfo="skip", showlegend=False), row=row, col=col)
         v = c["vector"] * 2 * c["sd"]
         pts = {k: (nom[k][0] + magnify * v[2 * j], nom[k][1] + magnify * v[2 * j + 1]) for j, k in enumerate(CORNERS)}
         xs, ys = polygon(pts)
         fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines+markers", line=dict(color=P.accent, width=2.5),
                                  marker=dict(size=7, color=P.accent), fill="toself", fillcolor=T.rgba(P.accent, 0.08),
                                  hovertemplate=f"PC{c['k']}: {c['share']:.1f}% of the variance<br>shown at 2σ = "
-                                               f"{2 * c['sd']:.2f} mm<extra></extra>", showlegend=False), row=1, col=i)
-        fig.update_xaxes(visible=False, row=1, col=i)
+                                               f"{2 * c['sd']:.2f} mm<extra></extra>", showlegend=False),
+                      row=row, col=col)
+        fig.update_xaxes(visible=False, row=row, col=col)
         fig.update_yaxes(visible=False, autorange="reversed", scaleanchor="x" if i == 1 else f"x{i}", scaleratio=1,
-                         row=1, col=i)
+                         row=row, col=col)
     for a in fig.layout.annotations:
         a.font = dict(size=12)
-    return T.style(fig, height=height, title=title, legend=False, margin=dict(t=84))
+    return T.style(fig, height=height if nrow == 1 else 230 * nrow + 40, title=title, legend=False,
+                   margin=dict(t=56))
 
 
 def mode_link(link: pd.DataFrame, bat_type: str, title: str | None = None, height: int = 340) -> go.Figure:

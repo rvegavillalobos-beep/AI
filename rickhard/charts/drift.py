@@ -94,7 +94,7 @@ def weekly_medians(vec: pd.DataFrame, title: str | None = None, height: int = 52
                 line=dict(color=P.type(t), width=2), marker=dict(size=7, color=P.type(t)), customdata=w["N"],
                 hovertemplate=f"<b>{t}</b> %{{x}} (n=%{{customdata}})<br>median {col} %{{y:+.3f}} {unit}<extra></extra>"),
                 row=row, col=1)
-    for row, label in enumerate(("Median centre X (mm)", "Median centre Y (mm)", "Median yaw (°)"), start=1):
+    for row, label in enumerate(("Centre X (mm)", "Centre Y (mm)", "Yaw (°)"), start=1):
         T.hline(fig, 0, P.ink["axis"], "solid", 1, None, row=row, col=1)
         fig.update_yaxes(title_text=label, row=row, col=1)
         fig.update_xaxes(type="category", categoryorder="array", categoryarray=weeks, row=row, col=1)

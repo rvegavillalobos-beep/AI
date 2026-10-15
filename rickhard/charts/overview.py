@@ -90,14 +90,15 @@ def status_by_type(first: pd.DataFrame, title: str | None = None, height: int | 
         fig.add_trace(go.Bar(
             y=ylab, x=pct[s], orientation="h", name=label, marker_color=P.status(s),
             marker_line=dict(width=1.5, color=P.ink["surface"]),
-            text=[f"{p:.1f}% ({int(n):,})" if (last or p >= 16) else "" for p, n in zip(pct[s], t[s])],
+            text=[(f"{p:.1f}%" if last else f"{p:.1f}% ({int(n):,})") if (last or p >= 16) else ""
+                  for p, n in zip(pct[s], t[s])],
             textposition="outside" if last else "inside", textangle=0, cliponaxis=False,
             insidetextanchor="middle",
             textfont=dict(color=P.status(s) if last else "#ffffff", size=12),
             customdata=np.stack([t[s], tot], axis=1),
             hovertemplate=f"%{{y}}<br>{label}: %{{x:.1f}}% (%{{customdata[0]}} of %{{customdata[1]}})<extra></extra>"))
     fig.update_layout(barmode="stack", bargap=0.4)
-    fig.update_xaxes(range=[0, 124], tickvals=[0, 25, 50, 75, 100], ticksuffix="%", title_text="Share of first runs")
+    fig.update_xaxes(range=[0, 122], tickvals=[0, 25, 50, 75, 100], ticksuffix="%", title_text="Share of first runs")
     fig.update_yaxes(autorange="reversed")
     return T.style(fig, height=height or 120 + 62 * len(t), title=title)
 
@@ -145,7 +146,7 @@ def corner_pareto(pareto: pd.DataFrame, n_nok: int, title: str | None = None, he
 
 
 def hotspot_map(first: pd.DataFrame, limit: float, nominals: Nominals, types: list[str],
-                exaggeration: float = 150.0, title: str | None = None, height: int = 360) -> go.Figure:
+                exaggeration: float = 150.0, title: str | None = None, height: int | None = None) -> go.Figure:
     """Where on the module do NOKs happen? Nominal outline per type; each
     corner's bubble is sized by its out-of-tolerance rate and an arrow shows
     its mean error (magnified)."""
@@ -153,7 +154,7 @@ def hotspot_map(first: pd.DataFrame, limit: float, nominals: Nominals, types: li
     types = [t for t in types if (first["BatteryType"] == t).any()]
     if not types:
         return T.empty("No modules.")
-    fig = make_subplots(rows=1, cols=len(types), subplot_titles=types, horizontal_spacing=0.06)
+    fig = make_subplots(rows=len(types), cols=1, subplot_titles=types, vertical_spacing=0.14)
     all_rates = []
     for t in types:
         sub = first[first["BatteryType"] == t]
@@ -168,7 +169,7 @@ def hotspot_map(first: pd.DataFrame, limit: float, nominals: Nominals, types: li
         nom = nominals.get(t)
         xs, ys = polygon(nom)
         fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines", line=dict(color=P.nominal, width=1.5, dash="dash"),
-                                 hoverinfo="skip", showlegend=False), row=1, col=k)
+                                 hoverinfo="skip", showlegend=False), row=k, col=1)
         rates, labels, cx, cy, sizes, hov = [], [], [], [], [], []
         xref = "x" if k == 1 else f"x{k}"
         yref = "y" if k == 1 else f"y{k}"
@@ -194,13 +195,14 @@ def hotspot_map(first: pd.DataFrame, limit: float, nominals: Nominals, types: li
                                arrowcolor=P.ink["secondary"], text="")
         fig.add_trace(go.Scatter(
             x=cx, y=cy, mode="markers+text", text=labels, cliponaxis=False,
-            textposition=["top right", "bottom right", "top left", "bottom left"],  # FL, FR, RL, RR on screen
+            # FL, FR, RL, RR: each label points into the module so neighbours never collide
+            textposition=["bottom left", "top left", "bottom right", "top right"],
             textfont=dict(size=12),
             marker=dict(size=sizes, color=[T.rgba(P.status("FAIL"), 0.15 + 0.6 * r / rmax) for r in rates],
                         line=dict(color=P.status("FAIL"), width=1.5)),
-            hovertext=hov, hoverinfo="text", showlegend=False), row=1, col=k)
+            hovertext=hov, hoverinfo="text", showlegend=False), row=k, col=1)
         fig.update_yaxes(autorange="reversed", scaleanchor=xref, scaleratio=1,
-                         showgrid=False, zeroline=False, showticklabels=False, row=1, col=k)
-        fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False, row=1, col=k,
-                         range=[min(xs) - 650, max(xs) + 650])
-    return T.style(fig, height=height, title=title, legend=False, margin=dict(b=8))
+                         showgrid=False, zeroline=False, showticklabels=False, row=k, col=1)
+        fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False, row=k, col=1,
+                         range=[min(xs) - 250, max(xs) + 250])
+    return T.style(fig, height=height or 70 + 230 * len(types), title=title, legend=False, margin=dict(b=8))
