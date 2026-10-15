@@ -161,14 +161,23 @@ def generate(a: Analysis, extras: dict | None = None) -> tuple[list[Insight], li
     nok = f[f["Status"] != "PASS"]
     if len(nok) >= 5 and "Mechanism" in nok:
         mc = nok["Mechanism"].value_counts(normalize=True) * 100
-        placement = float(mc.reindex(["Shift", "Yaw", "Shift + yaw"]).fillna(0).sum())
-        shape = float(mc.reindex(["Shape"]).fillna(0).sum())
+
+        def pct(*names: str) -> float:
+            return float(mc.reindex(list(names)).fillna(0).sum())
+
+        placement = pct("Shift", "Yaw", "Shift + yaw")
+        others = [(pct("Shape"), "mainly because of their **shape**"),
+                  (pct("Placement + shape"), "because placement and shape add up"),
+                  (pct("Height (Z)"), "on height (Z)"),
+                  (pct("Missing corner"), "with a missing corner")]
+        rest = ", ".join(f"{v:.0f}% {txt}" for v, txt in others if v >= 0.5)
         top = mc.index[0]
         out.append(Insight(
             "warn" if placement >= 50 else "info", "Why modules fail",
             f"**{placement:.0f}%** of NOK modules fail mainly because of their **placement** (shift / yaw) — "
-            f"the part a conveyor adjustment can fix; **{shape:.0f}%** mainly because of their **shape**; "
-            f"most common: **{top}** ({mc.iloc[0]:.0f}%).", "mechanism", page="anatomy", score=16 + placement / 10))
+            f"the part a conveyor adjustment can fix" + (f"; {rest}" if rest else "")
+            + f". Most common: **{top}** ({mc.iloc[0]:.0f}%).", "mechanism", page="anatomy",
+            score=16 + placement / 10))
 
     # 5 — systematic placement → compensation
     sugg = ex.get("placement")

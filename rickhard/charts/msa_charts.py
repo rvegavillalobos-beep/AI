@@ -101,7 +101,7 @@ def z_surface(surf: dict, bat_type: str, title: str | None = None, height: int =
         x=surf["x"], y=surf["y"], z=Z, colorscale=P.diverging, zmin=-zabs, zmax=zabs, ncontours=14,
         contours=dict(coloring="heatmap", showlabels=True, labelfont=dict(size=10, color=P.ink["secondary"])),
         line=dict(width=0.6, color=T.rgba(P.ink["secondary"], 0.4)),
-        colorbar=dict(title="Z (mm)", thickness=12, len=0.8),
+        colorbar=dict(title="Z (mm)", thickness=10, len=0.9, xpad=6),
         hovertemplate="X %{x:.0f} · Y %{y:.0f}<br>Z %{z:+.3f} mm<extra></extra>"))
     xs, ys = polygon(nom)
     fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines", line=dict(color=P.nominal, width=2, dash="dash"),
@@ -115,9 +115,11 @@ def z_surface(surf: dict, bat_type: str, title: str | None = None, height: int =
         textfont=dict(size=12, color=P.ink["primary"]), marker=dict(size=10, color=P.type(bat_type),
                                                                    line=dict(color=P.ink["surface"], width=2)),
         hovertemplate="%{text} mm (mean corner Z)<extra></extra>", showlegend=False))
-    fig.update_xaxes(title_text="Global X (mm) — front →", showgrid=False,
-                     range=[min(cx) - 120, max(cx) + 120], constrain="domain")
-    fig.update_yaxes(title_text="Global Y (mm)", showgrid=False, range=[max(cy) + 140, min(cy) - 140],
+    # a top view, not a measurement: no axes, so the drawing gets the whole width
+    fig.add_annotation(x=max(cx), y=max(cy) + 105, text="front →", showarrow=False, xanchor="right",
+                       yanchor="middle", font=dict(size=11, color=P.ink["secondary"]))
+    fig.update_xaxes(visible=False, range=[min(cx) - 120, max(cx) + 120], constrain="domain")
+    fig.update_yaxes(visible=False, range=[max(cy) + 140, min(cy) - 140],
                      scaleanchor="x", scaleratio=1, constrain="domain")
     return T.style(fig, height=height, title=title, legend=False)
 

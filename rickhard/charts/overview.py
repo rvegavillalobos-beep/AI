@@ -195,8 +195,9 @@ def hotspot_map(first: pd.DataFrame, limit: float, nominals: Nominals, types: li
                                arrowcolor=P.ink["secondary"], text="")
         fig.add_trace(go.Scatter(
             x=cx, y=cy, mode="markers+text", text=labels, cliponaxis=False,
-            # FL, FR, RL, RR: each label sits under / over its own bubble, inside the module
-            textposition=["bottom center", "top center", "bottom center", "top center"],
+            # FL, FR, RL, RR: labels sit outside the module, beside their bubble (front corners on
+            # the right), so neither the outline nor the arrows run through them
+            textposition=["middle right", "middle right", "middle left", "middle left"],
             textfont=dict(size=12),
             marker=dict(size=sizes, color=[T.rgba(P.status("FAIL"), 0.15 + 0.6 * r / rmax) for r in rates],
                         line=dict(color=P.status("FAIL"), width=1.5)),
