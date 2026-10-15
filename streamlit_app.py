@@ -22,6 +22,12 @@ except Exception:  # noqa: BLE001 - older Streamlit without st.context.theme
 
 sidebar.brand()
 
+# "?demo" in the address opens the app straight on the demo data (handy for showing it to others)
+if "demo" in st.query_params and not st.session_state.get("_qp_demo"):
+    st.session_state["_qp_demo"] = True
+    if not state.files():
+        sidebar.load_demo()
+
 context = None
 if state.files():
     try:

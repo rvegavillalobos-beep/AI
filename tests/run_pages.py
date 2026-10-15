@@ -77,6 +77,16 @@ def main() -> int:
     for p in PAGES[1:]:
         results.append(scenario(f"{p} (one week)", p))
 
+    # a fresh session opened with "?demo" in the address lands on the demo data
+    def fresh_with_demo_param():
+        st.session_state.clear()
+        st.query_params["demo"] = ""
+    r = scenario("fresh session with ?demo", "corners", before=fresh_with_demo_param)
+    if st.session_state.get("_ctx") is None or st.session_state.get("_page") != "corners":
+        r["status"], r["error"] = "ERROR", "?demo did not open the demo data on the requested page"
+    st.query_params.clear()
+    results.append(r)
+
     bad = [r for r in results if r["status"] == "ERROR" or r["st_errors"]]
     if "--json" in sys.argv:
         print(json.dumps(results, indent=1, default=str))

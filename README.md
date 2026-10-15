@@ -33,7 +33,8 @@ streamlit run streamlit_app.py
 
 No data at hand? Press **Explore with demo data** on the start page: a synthetic export in the same format with a
 realistic process story (an end-stop adjustment, guide wear and a realignment, a night-shift offset, deformed
-modules, re-measurements). The numbers are invented.
+modules, re-measurements). The numbers are invented. Adding `?demo` to the app's address opens it directly on the
+demo data.
 
 ## The data
 
