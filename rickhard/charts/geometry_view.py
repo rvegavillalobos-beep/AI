@@ -3,8 +3,6 @@ the single-module drawing used by the passport."""
 
 from __future__ import annotations
 
-import os
-
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -29,21 +27,6 @@ def _tol_boxes(fig, nom: dict, half: float, color, name="Tolerance zone"):
 def _scale_note(text: str) -> dict:
     return dict(x=1, y=0, xref="paper", yref="paper", xanchor="right", yanchor="bottom", showarrow=False,
                 text=text, font=dict(size=11, color=T.pal().ink["muted"]))
-
-
-def short_ids(ids, width: int = 12) -> list[str]:
-    """Compact legend labels: the last ``width`` characters of each Part ID
-    before the tail all IDs share (that is where serial numbers differ)."""
-    ids = [str(i) for i in ids]
-    if len(ids) < 2:
-        return [i if len(i) <= width + 2 else "…" + i[-width:] for i in ids]
-    suf = len(os.path.commonprefix([i[::-1] for i in ids]))
-    out = []
-    for i in ids:
-        end = max(len(i) - suf, min(width, len(i)))
-        start = max(0, end - width)
-        out.append(("…" if start > 0 else "") + i[start:end] + ("…" if end < len(i) else ""))
-    return out
 
 
 def outlines(df: pd.DataFrame, nominals: Nominals, limit: float, exaggeration: float = 1.0,
@@ -82,7 +65,7 @@ def outlines(df: pd.DataFrame, nominals: Nominals, limit: float, exaggeration: f
             dx, dy = r[f"{c}_X"], r[f"{c}_Y"]
             if pd.notna(dx) and pd.notna(dy):
                 pts[c] = (nom[c][0] + exaggeration * float(dx), nom[c][1] + exaggeration * float(dy))
-        if len(pts) < 2:
+        if len(pts) < len(CORNERS):  # a module with a missing corner has no outline to draw
             continue
         xs, ys = polygon(pts)
         groups[st].append((xs, ys, f"{r['PartID']} · Run {int(r['RunNum'])} · {r['Status']}", r["PartID"],
@@ -93,8 +76,6 @@ def outlines(df: pd.DataFrame, nominals: Nominals, limit: float, exaggeration: f
     n_mod = sum(len(v) for v in groups.values())
     if per_module is None:
         per_module = 0 < n_mod <= 60
-    labels = dict(zip([(it[3], it[4]) for v in groups.values() for it in v],
-                      short_ids([it[3] for v in groups.values() for it in v])))
     for st in ("FAIL", "INCOMPLETE", "PASS"):
         items = groups[st]
         if not items:
@@ -103,7 +84,7 @@ def outlines(df: pd.DataFrame, nominals: Nominals, limit: float, exaggeration: f
         if per_module:
             for k, (xs, ys, lab, pid, run) in enumerate(items):
                 fig.add_trace(go.Scatter(
-                    x=xs, y=ys, mode="lines+markers", name=f"{labels[(pid, run)]} · R{run}", legendgroup=st,
+                    x=xs, y=ys, mode="lines+markers", name=f"{pid} · R{run}", legendgroup=st,
                     legendgrouptitle_text=f"{name} ({len(items)})" if k == 0 else None,
                     line=dict(color=color, width=width), marker=dict(size=4, color=color),
                     hovertext=[lab] * len(xs), hoverinfo="text"))
@@ -121,7 +102,7 @@ def outlines(df: pd.DataFrame, nominals: Nominals, limit: float, exaggeration: f
         pts = {c: (nom[c][0] + exaggeration * float(focus_row[f"{c}_X"]),
                    nom[c][1] + exaggeration * float(focus_row[f"{c}_Y"]))
                for c in CORNERS if pd.notna(focus_row[f"{c}_X"]) and pd.notna(focus_row[f"{c}_Y"])}
-        if len(pts) >= 2:
+        if len(pts) == len(CORNERS):
             xs, ys = polygon(pts)
             fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines+markers", name=f"★ {focus_row['PartID']} (focus)",
                                      line=dict(color=P.focus, width=4),
@@ -133,17 +114,24 @@ def outlines(df: pd.DataFrame, nominals: Nominals, limit: float, exaggeration: f
                                    font=dict(size=11, color=P.ink["primary"]), bgcolor=T.rgba(P.ink["surface"], 0.85))
     fig.update_xaxes(title_text="Global X (mm) — front →")
     fig.update_yaxes(title_text="Global Y (mm)", autorange="reversed", scaleanchor="x", scaleratio=1)
-    if exaggeration != 1:
-        fig.add_annotation(**_scale_note(f"deviations ×{exaggeration:g} · boxes = ±{limit:g} mm (scaled)"))
     T.style(fig, height=height, title=title)
     if per_module:
-        # one entry per module, below the drawing so the drawing keeps the full width
-        rows = int(np.ceil((n_mod + 2 * len(types) + 3) / 5))
-        fig.update_layout(height=height + 20 * rows,
-                          legend=dict(orientation="h", x=0, xanchor="left", y=-0.1, yanchor="top", entrywidth=150,
-                                      font=dict(size=10), groupclick="toggleitem", itemclick="toggle",
-                                      itemdoubleclick="toggleothers", traceorder="grouped", tracegroupgap=6),
-                          margin=dict(t=12))
+        # one entry per module with the full Part ID: a NOK column and an OK column under the axis title
+        # (the nominal is named in the note instead). The figure grows by the longest column, so the
+        # drawing keeps its size and the legend never needs a scrollbar.
+        fig.update_traces(showlegend=False, selector=dict(legendgroup="ref"))
+        names = [f"{it[3]} · R{it[4]}" for v in groups.values() for it in v]
+        entry_w = int(min(380, 44 + 5.9 * max(len(n) for n in names)))
+        tallest = max(len(v) for v in groups.values())
+        leg_h = 34 + 19 * tallest
+        fig.update_layout(height=height + leg_h, margin=dict(t=12, b=72 + leg_h),
+                          legend=dict(orientation="h", x=0, xanchor="left", yref="container", y=0, yanchor="bottom",
+                                      entrywidth=entry_w, maxheight=leg_h + 20, font=dict(size=10),
+                                      groupclick="toggleitem", itemclick="toggle", itemdoubleclick="toggleothers",
+                                      traceorder="grouped", tracegroupgap=6))
+    if exaggeration != 1:
+        fig.add_annotation(**_scale_note(f"deviations ×{exaggeration:g} · boxes = ±{limit:g} mm (scaled)"
+                                         + (" · green dashed = nominal" if per_module else "")))
     return fig
 
 

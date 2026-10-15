@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 
 from ..config import Nominals
 from ..constants import CORNERS
-from ..geometry import polygon
+from ..geometry import order_corners_convex, polygon
 from . import theme as T
 
 SYMBOLS = {"No compensation": "circle-open", "Median-based": "square", "Rigid fit (mean)": "diamond",
@@ -183,25 +183,42 @@ def weekly_real_vs_sim(sim: pd.DataFrame, title: str | None = None, height: int 
 
 
 def outline_overlay(sim: pd.DataFrame, bat_type: str, nominals: Nominals, magnify: float = 50.0,
-                    title: str | None = None, height: int = 400) -> go.Figure:
-    """Nominal vs measured (avg) vs compensated (avg), magnified (original view)."""
+                    title: str | None = None, height: int = 440, limit: float | None = None) -> go.Figure:
+    """Nominal vs measured (avg) vs compensated (avg), magnified (original
+    view), with the tolerance zone of each corner at the same scale."""
     P = T.pal()
     nom = nominals.get(bat_type)
     d = sim[sim["BatteryType"] == bat_type]
     fig = go.Figure()
+    span = min(max(p[0] for p in nom.values()) - min(p[0] for p in nom.values()),
+               max(p[1] for p in nom.values()) - min(p[1] for p in nom.values()))
+    if limit and limit * magnify <= 0.2 * span:  # at high magnification the zones would cover the module
+        h = limit * magnify
+        bx, by = [], []
+        for c in CORNERS:
+            x0, y0 = nom[c]
+            bx += [x0 - h, x0 + h, x0 + h, x0 - h, x0 - h, None]
+            by += [y0 - h, y0 - h, y0 + h, y0 + h, y0 - h, None]
+        fig.add_trace(go.Scatter(x=bx, y=by, mode="lines", name=f"Tolerance ±{limit:g} mm",
+                                 line=dict(color=T.rgba(T.STATUS["warning"], 0.9), width=1.2, dash="dot"),
+                                 hoverinfo="skip"))
     xs, ys = polygon(nom)
-    fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines", name="Nominal", line=dict(color=P.nominal, width=2, dash="dash")))
+    fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines", name="Nominal", line=dict(color=P.nominal, width=2, dash="dash"),
+                             hoverinfo="skip"))
     if len(d):
-        meas = {c: (nom[c][0] + magnify * d[f"{c}_X"].mean(), nom[c][1] + magnify * d[f"{c}_Y"].mean()) for c in CORNERS}
-        comp = {c: (nom[c][0] + magnify * d[f"{c}_X_Sim"].mean(), nom[c][1] + magnify * d[f"{c}_Y_Sim"].mean())
-                for c in CORNERS}
-        mx, my = polygon(meas)
-        cx, cy = polygon(comp)
-        fig.add_trace(go.Scatter(x=mx, y=my, mode="lines+markers", name="Measured (avg)",
-                                 line=dict(color=P.ink["muted"], width=2.5)))
-        fig.add_trace(go.Scatter(x=cx, y=cy, mode="lines+markers", name="Compensated (avg)",
-                                 line=dict(color=P.accent, width=2.5)))
-    fig.update_yaxes(autorange="reversed", scaleanchor="x", scaleratio=1)
+        for label, sfx, color in (("Measured (avg)", "", P.ink["muted"]), ("Compensated (avg)", "_Sim", P.accent)):
+            mean = {c: (float(d[f"{c}_X{sfx}"].mean()), float(d[f"{c}_Y{sfx}"].mean())) for c in CORNERS}
+            if not np.isfinite(np.array(list(mean.values()))).all():
+                continue
+            pts = {c: (nom[c][0] + magnify * mx_, nom[c][1] + magnify * my_) for c, (mx_, my_) in mean.items()}
+            order = list(order_corners_convex(pts))
+            order = order + order[:1]           # closed outline
+            fig.add_trace(go.Scatter(
+                x=[pts[c][0] for c in order], y=[pts[c][1] for c in order], mode="lines+markers", name=label,
+                line=dict(color=color, width=2.5), marker=dict(size=7, color=color), hoverinfo="text",
+                hovertext=[f"<b>{c}</b> · {label}<br>X {mean[c][0]:+.2f} · Y {mean[c][1]:+.2f} mm" for c in order]))
+    fig.update_xaxes(title_text="Global X (mm) — front →")
+    fig.update_yaxes(title_text="Global Y (mm)", autorange="reversed", scaleanchor="x", scaleratio=1)
     fig.add_annotation(x=1, y=0, xref="paper", yref="paper", xanchor="right", yanchor="bottom", showarrow=False,
                        text=f"{bat_type} · deviations ×{magnify:g}", font=dict(size=11, color=P.ink["muted"]))
     return T.style(fig, height=height, title=title)

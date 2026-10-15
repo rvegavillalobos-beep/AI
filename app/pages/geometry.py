@@ -21,8 +21,10 @@ with tab1:
         state.ensure_option("p_geo_scope", scopes, "First runs")
         scope = st.segmented_control("Runs", scopes, key="p_geo_scope") or "First runs"
     with ctl[1]:
-        sts = ["OK", "NOK", "Incomplete"]
-        state.init("p_geo_status", ["OK", "NOK", "Incomplete"])
+        sts = ["OK", "NOK"]
+        state.init("p_geo_status", list(sts))
+        if not isinstance(st.session_state["p_geo_status"], list) or not set(st.session_state["p_geo_status"]) <= set(sts):
+            st.session_state["p_geo_status"] = [s for s in (st.session_state["p_geo_status"] or []) if s in sts]
         shown = st.pills("Show", sts, selection_mode="multi", key="p_geo_status") or []
     with ctl[2]:
         state.init("p_geo_exag", 20.0)
@@ -36,10 +38,13 @@ with tab1:
             tsel = types[0]
 
     base = a.first if scope == "First runs" else a.runs
-    base = base.sort_values("Date").reset_index(drop=True)
     if tsel != "All types":
-        base = base[base["BatteryType"] == tsel].reset_index(drop=True)
+        base = base[base["BatteryType"] == tsel]
         types = [tsel]
+    # a module with a missing corner has no outline: it is left out of the drawing, the slider and the table
+    complete = base[[f"{k}_{ax}" for k in CORNERS for ax in "XY"]].notna().all(axis=1)
+    n_missing = int((~complete).sum())
+    base = base[complete].sort_values("Date").reset_index(drop=True)
     n_all = len(base)
     rng = st.session_state.get("p_geo_range")
     if (not isinstance(rng, (tuple, list)) or len(rng) != 2 or not (0 <= rng[0] <= rng[1] <= max(0, n_all - 1))
@@ -54,7 +59,8 @@ with tab1:
     plot_df = base.iloc[int(i0): int(i1) + 1]
     if len(plot_df):
         st.caption(f"{ui.plural(len(plot_df), 'module')} · {plot_df['Date'].min():%Y-%m-%d %H:%M} – "
-                   f"{plot_df['Date'].max():%Y-%m-%d %H:%M}")
+                   f"{plot_df['Date'].max():%Y-%m-%d %H:%M}"
+                   + (f" · {ui.plural(n_missing, 'module')} with a missing corner not drawn" if n_missing else ""))
 
     # focus: pick any module by (part of) its ID, or select a row in the table below
     focus = state.focus()
@@ -71,7 +77,7 @@ with tab1:
         focus = picked
     if focus and focus in set(base["_mod_key"]) and focus not in set(plot_df["_mod_key"]):
         plot_df = pd.concat([plot_df, base[base["_mod_key"] == focus]])
-    status_map = {"OK": "PASS", "NOK": "FAIL", "Incomplete": "INCOMPLETE"}
+    status_map = {"OK": "PASS", "NOK": "FAIL"}
     status_filter = tuple(status_map[s] for s in shown)
 
     left, right = st.columns([3.2, 1], gap="large")

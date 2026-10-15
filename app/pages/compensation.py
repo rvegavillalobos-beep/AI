@@ -6,6 +6,7 @@ from app import data, state, ui
 from rickhard import compensation as comp
 from rickhard.charts import comp_charts as ccmp
 from rickhard.charts import svg
+from rickhard.constants import CORNERS
 
 c = data.ctx()
 a, r = c.a, c.rules
@@ -147,11 +148,30 @@ ui.kpi_cards([
 ])
 
 # ---- Work instruction --------------------------------------------------------------------------
+sim = comp.simulate_table(v, (dx, dy, yaw), lim, nom)
+ox, oy = svg.correction_offsets(t, dx, dy, yaw, nom)
+nom_t = nom.get(t)
+span = min(max(p[0] for p in nom_t.values()) - min(p[0] for p in nom_t.values()),
+           max(p[1] for p in nom_t.values()) - min(p[1] for p in nom_t.values()))
+avg_dev = [abs(sim[f"{k}_{ax}{sfx}"].mean()) for k in CORNERS for ax in "XY" for sfx in ("", "_Sim")]
+largest = float(np.nanmax([*np.hypot(ox, oy), *avg_dev, 0.0]))
+auto_k = svg.auto_magnify(largest, span)
 left, right = st.columns([3, 2], gap="large")
 with left:
     ui.section("Work instruction for the line", "Where each corner must move, magnified. The arrows are the "
                                                 "equivalent per-corner offsets of the rigid correction.")
-    ui.svg_box(svg.work_instruction_svg(t, dx, dy, yaw, nom), "Work instruction: where each corner must move")
+    state.init("p_cp_mag", "Auto")
+    mag_opt = st.select_slider("Magnify the drawings ×", ["Auto", *svg.MAGNIFY_STEPS], key="p_cp_mag",
+                               format_func=lambda o: f"Auto (×{auto_k})" if o == "Auto" else f"×{o}",
+                               help="How much the deviations are enlarged in the work instruction and the average "
+                                    "outline below. Auto sizes the largest one to about 15 % of the module.")
+    k_mag = auto_k if mag_opt == "Auto" else int(mag_opt)
+    ui.svg_box(svg.work_instruction_svg(t, dx, dy, yaw, nom, magnify=k_mag),
+               "Work instruction: where each corner must move")
+    ui.section("Average module before and after", "The average outline of the modules in the window: measured "
+                                                  "today and with this correction applied, against the nominal "
+                                                  "(same magnification). A good correction puts it on nominal.")
+    ui.chart(ccmp.outline_overlay(sim, t, nom, magnify=k_mag, limit=lim), "cp_overlay")
 with right:
     ui.section("Equivalent corner offsets")
     st.dataframe(comp.equivalent_offsets_table({t: (dx, dy, yaw)}, nom), hide_index=True, width="stretch",
@@ -215,7 +235,6 @@ if bts:
                f"{bts.get(best, np.nan):.1f}% vs {bts.get('No compensation', np.nan):.1f}% without correction.")
 
 # ---- Original diagnostics -------------------------------------------------------------------------
-sim = comp.simulate_table(v, (dx, dy, yaw), lim, nom)
 with st.expander("Before / after diagnostics (original views)", icon=":material/compare:"):
     c1, c2 = st.columns(2)
     with c1:
@@ -226,18 +245,13 @@ with st.expander("Before / after diagnostics (original views)", icon=":material/
     with c3:
         ui.chart(ccmp.weekly_real_vs_sim(sim, title="FPY per week: real vs simulated"), "cp_wrs")
     with c4:
-        ui.chart(ccmp.outline_overlay(sim, t, nom, title="Average outline: nominal · measured · compensated"),
-                 "cp_overlay")
-    c5, c6 = st.columns(2)
-    with c5:
         ui.chart(ccmp.comp_vectors([{"BatteryType": t, "bias_x": float(v["Centroid_X"].median()),
                                      "bias_y": float(v["Centroid_Y"].median()), "dx": dx, "dy": dy}],
                                    title="Compensation vector: observed bias vs applied offset"), "cp_vec")
-    with c6:
-        ui.section("Transition matrix (original status → simulated status)")
-        st.dataframe(pd.crosstab(sim["Status"], sim["Status_Sim"]), width="stretch")
-    st.caption("A good correction points opposite to the observed bias; the outline overlay shows whether the "
-               "average module ends up on nominal.")
+    ui.section("Transition matrix (original status → simulated status)")
+    st.dataframe(pd.crosstab(sim["Status"], sim["Status_Sim"]), width="stretch")
+    st.caption("A good correction points opposite to the observed bias. The average outline before and after "
+               "is drawn under the work instruction.")
     ui.section("Piece-level simulation")
     cols = ["_mod_key", "CalendarWeek", "PartID", *[f"{k}" for k in ("FL_X", "FL_Y", "FR_X", "FR_Y", "RL_X", "RL_Y",
                                                                        "RR_X", "RR_Y")], "Status",
