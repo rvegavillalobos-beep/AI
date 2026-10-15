@@ -1,0 +1,45 @@
+name: QA screenshots
+
+on:
+  push:
+    branches: [qa-screens]
+
+permissions:
+  contents: write
+
+jobs:
+  shots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          pip install -r requirements-dev.txt playwright
+          python -m playwright install --with-deps chromium
+      - name: Tests with real Streamlit
+        run: |
+          mkdir -p shots
+          pytest -rs -v > shots/pytest.txt 2>&1 || true
+          pip freeze > shots/pip-freeze.txt
+      - name: Start servers
+        run: |
+          nohup streamlit run streamlit_app.py --server.headless true --server.port 8501 --theme.base light > shots/server-light.log 2>&1 &
+          nohup streamlit run streamlit_app.py --server.headless true --server.port 8502 --theme.base dark > shots/server-dark.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf localhost:8501/_stcore/health && curl -sf localhost:8502/_stcore/health && break; sleep 2; done
+      - name: Screenshots
+        run: |
+          python qa/screens.py http://localhost:8501 shots/light > shots/screens-light.txt 2>&1 || true
+          python qa/screens.py http://localhost:8502 shots/dark > shots/screens-dark.txt 2>&1 || true
+      - name: Publish
+        run: |
+          git config user.name "qa-bot"
+          git config user.email "qa-bot@users.noreply.github.com"
+          git checkout --orphan qa-screens-out
+          git rm -rf --cached . > /dev/null
+          git add -f shots
+          git commit -qm "QA screenshots"
+          git push -f origin qa-screens-out
