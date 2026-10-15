@@ -321,7 +321,7 @@ def weekly_placement(vec: pd.DataFrame) -> pd.DataFrame:
 
 def readiness(vec: pd.DataFrame, bt_sum: dict | None = None, recent_change: bool = False,
               min_n: int = 40, min_weeks: int = 4, min_week_n: int = 5,
-              xy_band: float = 0.5, yaw_band: float = 0.05) -> list[dict]:
+              xy_band: float = 0.5, yaw_band: float = 0.05, min_gain: float = 1.0) -> list[dict]:
     """Is the process stable enough to trust a compensation?"""
     items = []
     n = len(vec)
@@ -349,9 +349,11 @@ def readiness(vec: pd.DataFrame, bt_sum: dict | None = None, recent_change: bool
         none = bt_sum.get("No compensation", np.nan)
         best_m = bt_sum.get("best")
         best = bt_sum.get(best_m, np.nan) if best_m else np.nan
-        items.append({"check": "Helps in the backtest", "ok": bool(np.isfinite(best) and best - none >= 1.0),
+        gain = best - none
+        items.append({"check": "Helps in the backtest", "ok": bool(np.isfinite(gain) and gain >= min_gain),
                       "detail": f"applied week by week over {bt_sum['label']} ({bt_sum['n']} modules): "
-                                f"{none:.1f}% → {best:.1f}% with {best_m}"})
+                                f"{none:.1f}% → {best:.1f}% with {best_m}, {gain:+.1f} pp "
+                                f"(need ≥ +{min_gain:.1f} pp)"})
     else:
         items.append({"check": "Helps in the backtest", "ok": False,
                       "detail": "needs earlier weeks with enough modules to test on"})
