@@ -171,15 +171,6 @@ def suggestions(key: str, bat_type: str, weeks: int, sigma_xy: float, sigma_yaw:
     return out
 
 
-@st.cache_data(max_entries=48, show_spinner="Replaying past weeks…")
-def backtest(key: str, bat_type: str, weeks: int, sigma_xy: float, sigma_yaw: float, method: str,
-             _a: Analysis, mode: str = "fixed", test_weeks: int | None = None) -> pd.DataFrame:
-    v = window(_a, bat_type, weeks) if mode == "split" else _a.first[_a.first["BatteryType"] == bat_type]
-    return compensation.backtest(v, _a.settings.rules.spec_limit, _a.settings.nominals, window_weeks=weeks,
-                                 test_weeks=test_weeks, sigma_xy=sigma_xy, sigma_yaw=sigma_yaw,
-                                 median_method=method, mode=mode)
-
-
 @st.cache_data(max_entries=24, show_spinner="Simulating levers…")
 def sensitivity(key: str, comps_sig: str, compensate: bool, _a: Analysis, _comps: dict) -> dict:
     return improvement.sensitivity_curves(_a.first, _comps, _a.settings.rules.spec_limit, _a.settings.nominals,

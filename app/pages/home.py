@@ -33,7 +33,7 @@ st.html("""
   and a ranked action plan with the FPY each action is worth.</div>
   <div><b>Error Anatomy</b>Every module's corner errors split into 8 physical modes — shift, yaw, stretch,
   parallelogram, trapezoid — so you know which ones a conveyor adjustment can fix.</div>
-  <div><b>Compensation Studio</b>Median-based, rigid-fit and a robust optimum, back-tested week by week, with a
+  <div><b>Compensation Studio</b>Median-based, rigid-fit and a robust optimum, with how sure the gain is and a
   printable work instruction for the line.</div>
   <div><b>Path to Target</b>What-if levers on your own modules: how much scatter you must remove to reach the target.</div>
   <div><b>SPC Monitor</b>I-MR and weekly charts with run rules, and dated process shifts found automatically.</div>

@@ -1,4 +1,4 @@
-"""X / Y / yaw compensation: methods, exact evaluation, backtest and readiness."""
+"""X / Y / yaw compensation: methods, exact evaluation, gain uncertainty and readiness."""
 
 import numpy as np
 import pandas as pd
@@ -82,74 +82,15 @@ def test_exact_evaluation_is_consistent(vec):
     assert land["fpy"][j, i] == pytest.approx(ev["fpy"])
 
 
-def test_backtest_and_readiness(vec):
-    bt = comp.backtest(vec, LIMIT, NOM, window_weeks=3, test_weeks=4)
-    assert len(bt) == 4 and (bt["Trained on"] > 0).all()
-    assert bt["WeekKey"].is_monotonic_increasing and bt["WeekKey"].iloc[0] > vec["WeekKey"].min()
-    s = comp.backtest_summary(bt)
-    assert s["best"] != "No compensation" and s[s["best"]] > s["No compensation"] + 5
-    checks = {c["check"]: c["ok"] for c in comp.readiness(vec, s)}
+def test_readiness(vec):
+    boot = comp.bootstrap_gain(vec, comp.median_suggestion(vec), LIMIT, NOM, B=300)
+    checks = {c["check"]: c["ok"] for c in comp.readiness(vec, boot)}
     assert all(checks.values()), checks
-    checks = {c["check"]: c["ok"] for c in comp.readiness(vec, s, recent_change=True)}
+    checks = {c["check"]: c["ok"] for c in comp.readiness(vec, boot, recent_change=True)}
     assert not checks["No recent process shift"]
-
-
-def test_window_split_backtest_stays_inside_the_window(vec):
-    weeks = sorted(vec["WeekKey"].unique())
-    win = vec[vec["WeekKey"].isin(weeks[-3:])]
-    bt = comp.backtest(win, LIMIT, NOM, window_weeks=3, mode="split")
-    s = comp.backtest_summary(bt, "split")
-    d = win.sort_values("Date", kind="stable")
-    first, second = d.iloc[:len(d) // 2], d.iloc[len(d) // 2:]
-    assert s["n"] == len(second) and s["train_n"] == len(first)       # every module used once, nothing outside
-    assert set(bt["WeekKey"]) <= set(weeks[-3:])
-    learnt = comp.suggestions(first, LIMIT, NOM, fast=True)["settings"]["Rigid fit (mean)"]
-    assert s["settings"]["Rigid fit (mean)"] == pytest.approx(learnt)
-    assert s["Rigid fit (mean)"] == pytest.approx(comp.evaluate(second, learnt, LIMIT, NOM)["fpy"])
-    assert comp.backtest_text(s).startswith("learnt from the first half of the window")
-    assert comp.backtest(win.head(20), LIMIT, NOM, mode="split").empty            # too few modules
-
-
-def test_backtest_fits_short_data():
-    assert comp.auto_test_weeks(15, 6) == 8      # enough data: a full window and 8 test weeks
-    assert comp.auto_test_weeks(7, 6) == 2       # 7 weeks: test on 2, learn from the 5 before
-    assert comp.auto_test_weeks(7, 3) == 4       # a shorter window leaves more weeks to test on
-    assert comp.auto_test_weeks(2, 6) == 1 and comp.auto_test_weeks(1, 6) == 0
-
-
-def test_backtest_on_seven_weeks(vec):
-    weeks = sorted(vec["WeekKey"].unique())
-    assert len(weeks) >= 7
-    v7 = vec[vec["WeekKey"].isin(weeks[-7:])]
-    bt = comp.backtest(v7, LIMIT, NOM, window_weeks=6, mode="fixed")
-    s = comp.backtest_summary(bt, "fixed")
-    assert s["weeks"] == 2 and s["train_weeks"] == 5
-    assert "(5 weeks)" in comp.backtest_text(s) and "(2 weeks," in comp.backtest_text(s)
-    bt6 = comp.backtest(v7, LIMIT, NOM, window_weeks=6, test_weeks=6, mode="fixed")
-    assert len(bt6) == 6 and (bt6["Train n weeks"] == 1).all()
-
-
-def test_set_once_backtest_never_updates_the_setting(vec):
-    fixed = comp.backtest(vec, LIMIT, NOM, window_weeks=3, test_weeks=4, mode="fixed")
-    rolling = comp.backtest(vec, LIMIT, NOM, window_weeks=3, test_weeks=4, mode="rolling")
-    assert list(fixed["WeekKey"]) == list(rolling["WeekKey"])                 # same test weeks
-    # set once: one setting, learnt from the 3 weeks before the first test week, for every test week
-    for m in comp.METHODS:
-        assert fixed[[f"{m} X", f"{m} Y", f"{m} Yaw"]].nunique().max() == 1
-    weeks = sorted(vec["WeekKey"].unique())
-    first = weeks.index(fixed["WeekKey"].iloc[0])
-    train = vec[vec["WeekKey"].isin(weeks[first - 3:first])]
-    s = comp.suggestions(train, LIMIT, NOM, fast=True)["settings"]["Median-based"]
-    assert tuple(fixed[[f"Median-based {k}" for k in ("X", "Y", "Yaw")]].iloc[0]) == pytest.approx(s)
-    for _, row in fixed.iterrows():
-        test = vec[vec["WeekKey"] == row["WeekKey"]]
-        assert row["Median-based"] == comp.evaluate(test, s, LIMIT, NOM)["pass"]
-    # recalculated: the setting follows the weeks
-    assert rolling[["Median-based X"]].nunique().iloc[0] > 1
-    summ = comp.backtest_summary(fixed, "fixed")
-    assert summ["mode"] == "fixed" and summ["settings"]["Median-based"] == pytest.approx(s)
-    assert comp.backtest_text(summ).startswith("set once from ")
-    assert comp.backtest_text(comp.backtest_summary(rolling, "rolling")).startswith("recalculated every week")
+    none = comp.bootstrap_gain(vec, (0.0, 0.0, 0.0), LIMIT, NOM, B=100)    # no correction: no gain to trust
+    assert not {c["check"]: c["ok"] for c in comp.readiness(vec, none)}["Clear gain"]
+    assert not {c["check"]: c["ok"] for c in comp.readiness(vec, {})}["Clear gain"]
 
 
 def test_bootstrap_gain(vec):

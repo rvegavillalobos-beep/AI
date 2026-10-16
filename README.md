@@ -12,13 +12,13 @@ A Streamlit dashboard for the first-measurement quality of battery modules at st
 - **Did something change?** SPC with run rules, process shifts dated automatically, and an alarm board that compares
   the last days with a baseline.
 - **What should we adjust, and is it safe?** X / Y / yaw compensation (the original median method, a rigid fit and a
-  robust optimum), back-tested week by week, with a readiness check and a work instruction for the line.
+  robust optimum), with the uncertainty of the gain, a readiness check and a work instruction for the line.
 - **What would it take to reach the target?** What-if levers simulated on your own modules.
 
 It builds on [RICKHARDV](https://github.com/rvegavillalobos-beep/RICKHARDV) and on its rebuild *Corner QC*
 ([New](https://github.com/rvegavillalobos-beep/New)): everything both computed is still here — corner targets, trend
 matrix, centroid drift and yaw, the squareness report and its link to NOK (would the module have passed if it were
-square?), median-based and optimised compensation with a backtest — with the same formulas and the same numbers
+square?), median-based and optimised compensation — with the same formulas and the same numbers
 (checked by the test suite against the original code). The Excel export keeps the original sheet names
 (`Module_Summary_Report`, `First_Run_Quality_Summary`, `Weekly_FPY_Trend`, …), so anything built on it keeps working.
 
@@ -31,7 +31,7 @@ square?), median-based and optimised compensation with a backtest — with the s
   </tr>
   <tr>
     <td><b>Compensation Studio</b> — median, rigid-fit, robust and your own X / Y / yaw side by side, with a
-      backtest and a work instruction for the line.</td>
+      bootstrap interval of the gain and a work instruction for the line.</td>
     <td><b>Shape &amp; Squareness</b> — would each NOK have passed if the module were square, or placed
       perfectly?</td>
   </tr>
@@ -104,7 +104,7 @@ small project file and loaded again later.
 | | **Re-measurement & MSA** | %GRR per corner coordinate estimated from production re-measurements; how often a NOK turns OK on the next run. |
 | | **Height (Z)** | Level, pitch, roll and twist of every module (shown when the export contains Z). |
 | Improve | **Path to Target** | What-if levers: how much offset and scatter must go to reach the FPY target, with a sensitivity chart. |
-| | **Compensation Studio** | Median, rigid-fit, robust and your own X / Y / yaw compared in-window, with a safety margin and out-of-sample (backtest), FPY maps over X / Y and yaw, readiness checklist, work instruction, piece-level simulation. |
+| | **Compensation Studio** | Median, rigid-fit, robust and your own X / Y / yaw compared in-window, with a safety margin and the bootstrap interval of the gain, FPY maps over X / Y and yaw, readiness checklist, work instruction, piece-level simulation. |
 | | **Interventions** | Log what was done to the line and get a before / after verdict with statistics. |
 | Tools | **Module Passport** | Everything about one module: runs, geometry, why it failed, what was produced around it. |
 | | **Data & Settings** | Data-quality report, reading options, nominal geometry, shift plan, project file. |
@@ -129,7 +129,7 @@ The methods are described in [docs/methodology.md](docs/methodology.md). In shor
 module with Wilson intervals; group differences use Fisher's exact test, Welch's t-test and Brown–Forsythe;
 capability uses the moving-range σ for Cp/Cpk and the overall σ for Pp/Ppk; the error anatomy is an exact
 orthonormal decomposition of the eight deviations; the robust compensation maximises the expected FPY under the
-observed placement noise and is validated out of sample (set once and left, or recalculated weekly).
+observed placement noise, and a paired bootstrap tells whether its gain is real or noise.
 
 ## Project layout
 
@@ -140,7 +140,7 @@ rickhard/             analytics package — no Streamlit imports, every number t
   loading.py          export reader (headers, CSV dialects, time zones, runs, de-duplication)
   analysis.py         the pipeline: runs → first runs → status, FPY, squareness, anatomy
   geometry.py         rigid fit and the eight-mode error decomposition
-  compensation.py     median / rigid / robust compensation, backtest, readiness
+  compensation.py     median / rigid / robust compensation, gain uncertainty, readiness
   spc.py, patterns.py, remeasure.py, zheight.py, events.py, improvement.py, insights.py
   report.py, report_html.py   Excel and HTML reports
   charts/             Plotly figures (colour-blind-safe palette, light and dark)

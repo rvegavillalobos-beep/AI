@@ -110,18 +110,11 @@ X and Y. Every method is evaluated exactly on the modules (each corner re-judged
   the setting maximises the **expected FPY** when the line places each module with Gaussian noise (σ 0.10 mm in X/Y and
   0.01° in yaw by default), and the smallest move wins ties. It optimises what matters — modules in tolerance — rather
   than a central value.
-* **Backtest** (out of sample: no module ever helps compute the setting it is judged with), over the last weeks
-  (Auto: what is left after a full N-week window, at least 2 and at most 8; or a number you choose):
-  * *Inside the window* (default — for a line that is adjusted often): the window's modules in time order; each
-    method's setting is learnt from the first half and left unchanged on the second half. Nothing outside the window
-    is used, so earlier set-ups of the line do not count. The page also flags logged interventions and detected
-    placement shifts inside the window, since a window that spans a change mixes two set-ups.
-  * *Set once from the weeks before* (a permanent correction on a line that was not changed): each method's setting is computed once from the
-    N weeks before the test period and applied unchanged to every test week. A line that slopes down over the weeks
-    means the process is moving away from the setting.
-  * *Recalculated every week*: each test week gets a fresh setting from the N weeks just before it.
+* **Changes inside the window**: logged interventions and detected placement shifts that fall inside the analysis
+  window are flagged, since a window that spans a change of the line mixes two set-ups.
 * **Readiness**: enough modules and weeks, stable weekly placement (medians within 0.5 mm and 0.05°), no change point
-  in the last two weeks, and a backtest gain of at least 1 pp. A paired bootstrap gives the uncertainty of the gain.
+  in the last two weeks, and a clear gain: at least +1 pp in the window with the 90 % paired-bootstrap interval of the
+  gain above 0.
 
 ## 11. Path to target and the action plan
 

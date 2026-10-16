@@ -83,47 +83,6 @@ def yaw_sweep(yaws, fpy, points: dict, title: str | None = None, height: int = 3
     return T.style(fig, height=height, title=title)
 
 
-def method_bars(rows: pd.DataFrame, title: str | None = None, height: int = 300) -> go.Figure:
-    """In-window vs backtest FPY per method."""
-    P = T.pal()
-    fig = go.Figure()
-    for col, name, alpha in (("In window", "In window (optimistic)", 0.4), ("Backtest", "Backtest (honest)", 1.0)):
-        if col not in rows:
-            continue
-        fig.add_trace(go.Bar(x=rows["Method"], y=rows[col], name=name,
-                             marker_color=[T.rgba(P.method(m), alpha) for m in rows["Method"]],
-                             marker_line=dict(color=[P.method(m) for m in rows["Method"]], width=1.5),
-                             text=[f"{v:.1f}%" if np.isfinite(v) else "" for v in rows[col].astype(float)],
-                             textposition="outside", cliponaxis=False,
-                             hovertemplate="%{x}<br>" + name + ": %{y:.1f}%<extra></extra>"))
-    vals = pd.concat([rows[c] for c in ("In window", "Backtest") if c in rows]).astype(float)
-    lo = max(0.0, float(np.nanmin(vals)) - 8) if vals.notna().any() else 0.0
-    fig.update_layout(barmode="group", bargap=0.3, bargroupgap=0.08)
-    fig.update_yaxes(range=[lo, 104], ticksuffix="%", title_text="FPY")
-    return T.style(fig, height=height, title=title)
-
-
-def backtest_chart(bt: pd.DataFrame, methods: list[str], title: str | None = None, height: int = 320,
-                   x_title: str = "Test week (setting computed from the weeks before it)") -> go.Figure:
-    P = T.pal()
-    if bt is None or bt.empty:
-        return T.empty("Needs earlier weeks with enough modules.")
-    fig = go.Figure()
-    for m in methods:
-        if m not in bt:
-            continue
-        y = bt[m] / bt["Modules"] * 100
-        fig.add_trace(go.Scatter(x=bt["Week"], y=y, mode="lines+markers", name=m,
-                                 line=dict(color=P.method(m), width=2.5 if m == "Robust optimum" else 2,
-                                           dash="dot" if m == "No compensation" else None),
-                                 marker=dict(size=8, color=P.method(m), symbol=SYMBOLS.get(m, "circle"),
-                                             line=dict(color=P.method(m), width=1.5)),
-                                 hovertemplate="%{x} · " + m + ": %{y:.1f}%<extra></extra>"))
-    fig.update_xaxes(type="category", title_text=x_title)
-    fig.update_yaxes(ticksuffix="%", title_text="FPY")
-    return T.style(fig, height=height, title=title)
-
-
 def before_after_centroids(sim: pd.DataFrame, title: str | None = None, height: int = 420) -> go.Figure:
     P = T.pal()
     fig = go.Figure()
