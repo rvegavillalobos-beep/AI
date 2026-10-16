@@ -94,6 +94,29 @@ def test_backtest_and_readiness(vec):
     assert not checks["No recent process shift"]
 
 
+def test_set_once_backtest_never_updates_the_setting(vec):
+    fixed = comp.backtest(vec, LIMIT, NOM, window_weeks=3, test_weeks=4, mode="fixed")
+    rolling = comp.backtest(vec, LIMIT, NOM, window_weeks=3, test_weeks=4, mode="rolling")
+    assert list(fixed["WeekKey"]) == list(rolling["WeekKey"])                 # same test weeks
+    # set once: one setting, learnt from the 3 weeks before the first test week, for every test week
+    for m in comp.METHODS:
+        assert fixed[[f"{m} X", f"{m} Y", f"{m} Yaw"]].nunique().max() == 1
+    weeks = sorted(vec["WeekKey"].unique())
+    first = weeks.index(fixed["WeekKey"].iloc[0])
+    train = vec[vec["WeekKey"].isin(weeks[first - 3:first])]
+    s = comp.suggestions(train, LIMIT, NOM, fast=True)["settings"]["Median-based"]
+    assert tuple(fixed[[f"Median-based {k}" for k in ("X", "Y", "Yaw")]].iloc[0]) == pytest.approx(s)
+    for _, row in fixed.iterrows():
+        test = vec[vec["WeekKey"] == row["WeekKey"]]
+        assert row["Median-based"] == comp.evaluate(test, s, LIMIT, NOM)["pass"]
+    # recalculated: the setting follows the weeks
+    assert rolling[["Median-based X"]].nunique().iloc[0] > 1
+    summ = comp.backtest_summary(fixed, "fixed")
+    assert summ["mode"] == "fixed" and summ["settings"]["Median-based"] == pytest.approx(s)
+    assert comp.backtest_text(summ).startswith("set once from ")
+    assert comp.backtest_text(comp.backtest_summary(rolling, "rolling")).startswith("recalculated every week")
+
+
 def test_bootstrap_gain(vec):
     g = comp.bootstrap_gain(vec, comp.median_suggestion(vec), LIMIT, NOM, B=300)
     assert g["lo"] <= g["gain"] <= g["hi"] and g["gain"] > 5 and g["p_positive"] > 0.99

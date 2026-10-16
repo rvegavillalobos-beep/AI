@@ -103,7 +103,8 @@ def method_bars(rows: pd.DataFrame, title: str | None = None, height: int = 300)
     return T.style(fig, height=height, title=title)
 
 
-def backtest_chart(bt: pd.DataFrame, methods: list[str], title: str | None = None, height: int = 320) -> go.Figure:
+def backtest_chart(bt: pd.DataFrame, methods: list[str], title: str | None = None, height: int = 320,
+                   x_title: str = "Test week (setting computed from the weeks before it)") -> go.Figure:
     P = T.pal()
     if bt is None or bt.empty:
         return T.empty("Needs earlier weeks with enough modules.")
@@ -118,7 +119,7 @@ def backtest_chart(bt: pd.DataFrame, methods: list[str], title: str | None = Non
                                  marker=dict(size=8, color=P.method(m), symbol=SYMBOLS.get(m, "circle"),
                                              line=dict(color=P.method(m), width=1.5)),
                                  hovertemplate="%{x} · " + m + ": %{y:.1f}%<extra></extra>"))
-    fig.update_xaxes(type="category", title_text="Test week (setting computed from the weeks before it)")
+    fig.update_xaxes(type="category", title_text=x_title)
     fig.update_yaxes(ticksuffix="%", title_text="FPY")
     return T.style(fig, height=height, title=title)
 

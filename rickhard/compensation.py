@@ -248,41 +248,93 @@ def suggestions(vec: pd.DataFrame, limit: float, nominals: Nominals, sigma_xy: f
 # Walk-forward backtest
 # ---------------------------------------------------------------------------
 
+BACKTEST_MODES = ("fixed", "rolling")
+
+
 def backtest(vec: pd.DataFrame, limit: float, nominals: Nominals, window_weeks: int = 6,
              test_weeks: int = 8, min_train: int = 15, sigma_xy: float = 0.10,
-             sigma_yaw: float = 0.01, median_method: str = "median") -> pd.DataFrame:
-    """Replay recent weeks as if each method had been in use: every test week
-    gets the setting computed from the ``window_weeks`` before it."""
+             sigma_yaw: float = 0.01, median_method: str = "median", mode: str = "fixed") -> pd.DataFrame:
+    """Replay the last ``test_weeks`` weeks as if each method had been in use.
+
+    ``mode="fixed"`` (set once and left): every method's setting is computed
+    ONCE from the ``window_weeks`` before the first test week and then left
+    unchanged for all the test weeks — how a permanent correction is used.
+    ``mode="rolling"``: every test week gets a fresh setting computed from the
+    ``window_weeks`` just before it.
+
+    In both modes no module ever helps compute the setting it is judged with.
+    """
     weeks = sorted(vec["WeekKey"].dropna().unique())
     labels = vec.drop_duplicates("WeekKey").set_index("WeekKey")["CalendarWeek"]
-    rows = []
-    for wk in weeks[-test_weeks:]:
-        prior = [w for w in weeks if w < wk][-window_weeks:]
+    cols = ["WeekKey", "Week", "Modules", "Trained on", "Train weeks", *METHODS,
+            *[f"{m} {k}" for m in METHODS for k in ("X", "Y", "Yaw")]]
+    test = weeks[-test_weeks:]
+    if mode == "fixed" and test and test[0] == weeks[0]:
+        test = test[1:]                        # the first week has nothing before it to learn from
+
+    def train_on(prior):
         train = vec[vec["WeekKey"].isin(prior)]
-        test = vec[vec["WeekKey"] == wk]
-        if len(train) < min_train or test.empty:
+        if len(train) < min_train:
+            return None, train
+        return suggestions(train, limit, nominals, sigma_xy, sigma_yaw, median_method, fast=True)["settings"], train
+
+    fixed = None
+    if mode == "fixed" and test:
+        prior = [w for w in weeks if w < test[0]][-window_weeks:]
+        fixed = (prior,) + train_on(prior)
+        if fixed[1] is None:
+            return pd.DataFrame(columns=cols)
+    rows = []
+    for wk in test:
+        if fixed is not None:
+            prior, sug, train = fixed
+        else:
+            prior = [w for w in weeks if w < wk][-window_weeks:]
+            sug, train = train_on(prior)
+        t = vec[vec["WeekKey"] == wk]
+        if sug is None or t.empty:
             continue
-        sug = suggestions(train, limit, nominals, sigma_xy, sigma_yaw, median_method, fast=True)["settings"]
-        row = {"WeekKey": int(wk), "Week": labels.get(wk, str(wk)), "Modules": len(test), "Trained on": len(train)}
+        row = {"WeekKey": int(wk), "Week": labels.get(wk, str(wk)), "Modules": len(t), "Trained on": len(train),
+               "Train weeks": (f"{labels.get(prior[0], prior[0])} – {labels.get(prior[-1], prior[-1])}"
+                               if len(prior) > 1 else str(labels.get(prior[0], prior[0])))}
         for m in METHODS:
-            s = sug.get(m)
-            row[m] = evaluate(test, s, limit, nominals)["pass"] if s is not None else np.nan
+            st_ = sug.get(m)
+            row[m] = evaluate(t, st_, limit, nominals)["pass"] if st_ is not None else np.nan
+            for k, val in zip(("X", "Y", "Yaw"), st_ if st_ is not None else (np.nan,) * 3):
+                row[f"{m} {k}"] = val
         rows.append(row)
-    return pd.DataFrame(rows, columns=["WeekKey", "Week", "Modules", "Trained on", *METHODS])
+    out = pd.DataFrame(rows, columns=cols)
+    out.attrs["mode"] = mode
+    return out
 
 
-def backtest_summary(bt: pd.DataFrame) -> dict:
+def backtest_summary(bt: pd.DataFrame, mode: str | None = None) -> dict:
     if bt is None or bt.empty:
         return {}
     n = int(bt["Modules"].sum())
-    out = {"n": n, "weeks": int(len(bt)),
+    mode = mode or bt.attrs.get("mode", "fixed")
+    out = {"n": n, "weeks": int(len(bt)), "mode": mode,
            "label": f"{bt['Week'].iloc[0]} – {bt['Week'].iloc[-1]}" if len(bt) > 1 else str(bt["Week"].iloc[0])}
+    if "Train weeks" in bt:
+        out["train_label"] = str(bt["Train weeks"].iloc[0])
     for m in METHODS:
         if m in bt and bt[m].notna().all():
             out[m] = float(bt[m].sum() / n * 100)
+            if mode == "fixed" and f"{m} X" in bt:
+                out.setdefault("settings", {})[m] = tuple(float(bt[f"{m} {k}"].iloc[0]) for k in ("X", "Y", "Yaw"))
     present = [m for m in METHODS if m in out]
     out["best"] = max(present, key=lambda m: out[m]) if present else None
     return out
+
+
+def backtest_text(bt_sum: dict) -> str:
+    """How the backtest was run, in words (for captions and the readiness check)."""
+    if not bt_sum:
+        return ""
+    if bt_sum.get("mode") == "rolling":
+        return f"recalculated every week over {bt_sum['label']} ({bt_sum['n']} modules)"
+    return (f"set once from {bt_sum.get('train_label', 'the weeks before')} and left unchanged over "
+            f"{bt_sum['label']} ({bt_sum['n']} modules)")
 
 
 # ---------------------------------------------------------------------------
@@ -351,7 +403,7 @@ def readiness(vec: pd.DataFrame, bt_sum: dict | None = None, recent_change: bool
         best = bt_sum.get(best_m, np.nan) if best_m else np.nan
         gain = best - none
         items.append({"check": "Helps in the backtest", "ok": bool(np.isfinite(gain) and gain >= min_gain),
-                      "detail": f"applied week by week over {bt_sum['label']} ({bt_sum['n']} modules): "
+                      "detail": f"{backtest_text(bt_sum)}: "
                                 f"{none:.1f}% → {best:.1f}% with {best_m}, {gain:+.1f} pp "
                                 f"(need ≥ +{min_gain:.1f} pp)"})
     else:
