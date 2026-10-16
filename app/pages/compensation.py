@@ -4,6 +4,7 @@ import streamlit as st
 
 from app import data, state, ui
 from rickhard import compensation as comp
+from rickhard import spc
 from rickhard.charts import comp_charts as ccmp
 from rickhard.charts import svg
 from rickhard.constants import CORNERS
@@ -52,24 +53,31 @@ with ctl[3]:
                            help="The methods table also shows how many modules would pass with at least this much "
                                 "room on every corner — a setting that only passes modules at the edge will not "
                                 "hold up.")
-        bt_opts = {"Set once and left unchanged": "fixed", "Recalculated every week": "rolling"}
-        state.ensure_option("p_cp_btmode", list(bt_opts), "Set once and left unchanged")
+        bt_opts = {"Inside the window: first half → second half": "split",
+                   "Set once from the weeks before the window": "fixed",
+                   "Recalculated every week": "rolling"}
+        state.ensure_option("p_cp_btmode", list(bt_opts), list(bt_opts)[0])
         bt_label = st.radio("Backtest the correction as", list(bt_opts), key="p_cp_btmode",
-                            help="Set once: each method's setting is computed from the N weeks before the test "
-                                 "period and then left alone for all the test weeks — a permanent correction. "
-                                 "Recalculated: every test week gets a fresh setting from the N weeks before it.")
-        auto_k = comp.auto_test_weeks(n_weeks_avail, int(weeks))
-        k_opts = ["Auto", *range(1, max(2, n_weeks_avail))]
-        state.ensure_option("p_cp_btweeks", k_opts, "Auto")
-        k_opt = st.select_slider("Backtest: weeks to test on", k_opts, key="p_cp_btweeks",
-                                 format_func=lambda o: f"Auto ({auto_k})" if o == "Auto" else str(o),
-                                 help="The last weeks of the sidebar range that the backtest judges. The settings "
-                                      "are learnt from up to N weeks before them (Last N weeks) — fewer if the data "
-                                      "does not reach that far back. Auto keeps a full window when it can and tests "
-                                      "on at least 2 and at most 8 weeks.")
+                            help="Inside the window (default): the window's modules in time order; the setting is "
+                                 "learnt from the first half and left unchanged on the second half. Nothing outside "
+                                 "the window is used — right for a line that is adjusted often. "
+                                 "Set once: learnt from the N weeks before the test weeks, then left unchanged. "
+                                 "Recalculated: every test week gets a fresh setting from the N weeks before it. "
+                                 "The last two only make sense if the line was not changed over those weeks.")
+        bt_mode = bt_opts[bt_label]
+        bt_k = None
+        if bt_mode != "split":
+            auto_tw = comp.auto_test_weeks(n_weeks_avail, int(weeks))
+            k_opts = ["Auto", *range(1, max(2, n_weeks_avail))]
+            state.ensure_option("p_cp_btweeks", k_opts, "Auto")
+            k_opt = st.select_slider("Backtest: weeks to test on", k_opts, key="p_cp_btweeks",
+                                     format_func=lambda o: f"Auto ({auto_tw})" if o == "Auto" else str(o),
+                                     help="The last weeks of the sidebar range that the backtest judges. The "
+                                          "settings are learnt from up to N weeks before them (Last N weeks) — fewer "
+                                          "if the data does not reach that far back. Auto keeps a full window when "
+                                          "it can and tests on at least 2 and at most 8 weeks.")
+            bt_k = None if k_opt == "Auto" else int(k_opt)
 method_key = "mean" if mname == "Mean" else "median"
-bt_mode = bt_opts[bt_label]
-bt_k = None if k_opt == "Auto" else int(k_opt)
 
 v = data.window(a, t, int(weeks))
 ui.require(v)
@@ -78,6 +86,29 @@ settings = dict(sug["settings"])
 opt = sug["optimum"]
 st.caption(f"Window: **{sug['label']}** · {len(v):,} first-run modules of {t}"
            + (f" · :orange[fewer than {min_n} modules — treat the result with caution]" if len(v) < min_n else ""))
+# changes to the line inside the window: logged interventions and detected placement shifts
+w0, w1 = v["Date"].min(), v["Date"].max()
+inside = []
+ev_all = c.events
+if len(ev_all):
+    e_in = ev_all[ev_all["Scope"].isin(["All", t]) & (ev_all["Date"] > w0) & (ev_all["Date"] <= w1)]
+    inside += [(pd.Timestamp(d), f"{ttl} (logged)") for d, ttl in zip(e_in["Date"], e_in["Title"])]
+cp_all = data.change_points(c.key, a)
+for (tt, col), idx in cp_all["idx"].items():
+    if tt != t or not idx:
+        continue
+    dates = vt_all.sort_values("Date").dropna(subset=[col])["Date"].to_numpy()
+    for i in idx:
+        d = pd.Timestamp(dates[min(i, len(dates) - 1)])
+        if w0 < d <= w1:
+            inside.append((d, f"{spc.PLACEMENT_VARS.get(col, col)} shift (detected)"))
+if inside:
+    inside.sort()
+    last = inside[-1][0]
+    st.caption(":orange[The line changed inside this window — "
+               + "; ".join(f"{d:%b %d}: {txt}" for d, txt in inside[-4:])
+               + f". The correction mixes modules from before and after; for today's set-up, use only modules "
+                 f"from {last:%b %d} on (a shorter Last N weeks, or the sidebar weeks).]")
 
 # ---- Manual ------------------------------------------------------------------------------------
 kx, ky, kyaw = f"p_man_x_{t}", f"p_man_y_{t}", f"p_man_yaw_{t}"
@@ -118,6 +149,8 @@ settings["Manual"] = (float(st.session_state[kx]), float(st.session_state[ky]), 
 bt = data.backtest(c.key, t, int(weeks), float(sigma), float(sigma_yaw), method_key, a, bt_mode, bt_k)
 bts = comp.backtest_summary(bt, bt_mode)
 once = bt_mode == "fixed"
+split = bt_mode == "split"
+BT_SHORT = {"split": "window split", "fixed": "set once", "rolling": "weekly"}[bt_mode]
 rows = []
 none_fpy = comp.evaluate(v, (0.0, 0.0, 0.0), lim, nom)["fpy"]
 for m, s in settings.items():
@@ -126,9 +159,10 @@ for m, s in settings.items():
                  "With margin": ev_["fpy_margin"], "Δ vs none": ev_["fpy"] - none_fpy, "Backtest": bts.get(m, np.nan)})
 mt = pd.DataFrame(rows)
 ui.section("Methods compared", "In window: FPY on the same modules the setting was computed from (optimistic). "
-                               + ("Backtest: the setting computed once from the weeks before the test period, then "
-                                  "left unchanged on the weeks after it — "
-                                  if once else
+                               + ("Backtest: the setting learnt from the first half of the window, left unchanged "
+                                  "on the second half — " if split else
+                                  "Backtest: the setting computed once from the weeks before the test period, then "
+                                  "left unchanged on the weeks after it — " if once else
                                   "Backtest: each recent week gets the setting computed from the weeks before it — ")
                                + "the honest estimate of what the line would see.")
 cfg = st.column_config
@@ -141,9 +175,10 @@ st.dataframe(mt, hide_index=True, width="stretch", column_config={
                                       help="Modules that would still pass with every corner limit tightened by the "
                                            "safety margin (set it in More)."),
     "Δ vs none": cfg.NumberColumn("Δ vs none (pp)", format="%+.1f"),
-    "Backtest": cfg.NumberColumn("FPY backtest" + (" (set once)" if once else " (weekly)"), format="%.1f%%",
-                                 help=(f"The setting this method computed from {bts.get('train_label', 'earlier weeks')}"
-                                       f", left unchanged on {bts.get('label', 'the weeks after')}." if once else
+    "Backtest": cfg.NumberColumn(f"FPY backtest ({BT_SHORT})", format="%.1f%%",
+                                 help=(f"The setting this method learnt from {bts.get('train_label', 'earlier weeks')}"
+                                       f", left unchanged on {bts.get('label', 'the modules after')}."
+                                       if (once or split) else
                                        "Each recent week judged with the setting this method computes from the "
                                        "weeks before it.")
                                       + " Manual values are not computed from data, so they have no backtest (empty).")})
@@ -167,10 +202,12 @@ ui.kpi_cards([
     {"label": "Modules fixed / broken", "value": f"{boot.get('fixed', 0)} / {boot.get('broken', 0)}",
      "sub": "NOK → OK vs OK → NOK in the window"},
     {"label": "Backtest of this method", "value": ui.fmt_pct(bts.get(applied_m, np.nan)) if applied_m != "Manual" else "–",
-     "sub": ((f"vs {bts.get('No compensation', np.nan):.1f}% without · set once from {bts.get('train_label', '')}, "
+     "sub": ((f"vs {bts.get('No compensation', np.nan):.1f}% without · learnt {bts.get('train_label', '')}, "
+              f"tested {bts.get('label', '')}" if split else
+              f"vs {bts.get('No compensation', np.nan):.1f}% without · set once from {bts.get('train_label', '')}, "
               f"tested {bts.get('label', '')}" if once else
               f"vs {bts.get('No compensation', np.nan):.1f}% without · recalculated weekly, {bts.get('label', '')}")
-             if bts else "needs more weeks")},
+             if bts else ("needs at least 30 modules in the window" if split else "needs more weeks"))},
 ])
 
 # ---- Work instruction --------------------------------------------------------------------------
@@ -255,13 +292,18 @@ with right:
 
 ui.section("Backtest week by week",
            "FPY of each test week with each method's setting. "
-           + ("Set once: the setting comes from the weeks before the test period and is never updated, so a line "
+           + ("Window split: the setting is learnt from the first half of the window and never updated on the "
+              "second half — nothing outside the window is used, so earlier set-ups of the line do not count."
+              if split else
+              "Set once: the setting comes from the weeks before the test period and is never updated, so a line "
               "that slopes down over the weeks means the process moved away from it — the correction would need a "
               "re-check." if once else
               "Recalculated: every week gets a setting from the weeks just before it.")
            + " Change the mode under More.")
 ui.chart(ccmp.backtest_chart(bt, list(comp.METHODS),
-                             x_title=(f"Test week (setting computed once from {bts.get('train_label', '')})" if once
+                             x_title=(f"Second half of the window (setting learnt from {bts.get('train_label', '')})"
+                                      if split else
+                                      f"Test week (setting computed once from {bts.get('train_label', '')})" if once
                                       else "Test week (setting recomputed from the weeks before it)")), "cp_bt")
 if bts:
     best = bts.get("best")
@@ -271,7 +313,7 @@ if bts:
         st.caption(f":orange[The data has {n_weeks_avail} weeks: to keep {bts['weeks']} for testing, the settings "
                    f"were learnt from {bts['train_weeks']} instead of {int(weeks)}. Fewer test weeks (More → "
                    f"Backtest: weeks to test on) leave more to learn from.]")
-    if once and bts.get("settings"):
+    if (once or split) and bts.get("settings"):
         st.caption("Settings used: " + " · ".join(
             f"{m} X {x:+.2f} · Y {y:+.2f} · yaw {w:+.3f}°" for m, (x, y, w) in bts["settings"].items()
             if m != "No compensation"))

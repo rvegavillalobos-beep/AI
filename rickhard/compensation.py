@@ -248,7 +248,7 @@ def suggestions(vec: pd.DataFrame, limit: float, nominals: Nominals, sigma_xy: f
 # Walk-forward backtest
 # ---------------------------------------------------------------------------
 
-BACKTEST_MODES = ("fixed", "rolling")
+BACKTEST_MODES = ("split", "fixed", "rolling")
 
 
 def auto_test_weeks(n_weeks: int, window_weeks: int, most: int = 8) -> int:
@@ -273,8 +273,13 @@ def backtest(vec: pd.DataFrame, limit: float, nominals: Nominals, window_weeks: 
     ``mode="rolling"``: every test week gets a fresh setting computed from the
     ``window_weeks`` just before it.
 
-    In both modes no module ever helps compute the setting it is judged with.
+    ``mode="split"``: see :func:`backtest_split` (``vec`` is then the window).
+
+    In every mode no module ever helps compute the setting it is judged with.
     """
+    if mode == "split":
+        return backtest_split(vec, limit, nominals, min_train=min_train, sigma_xy=sigma_xy, sigma_yaw=sigma_yaw,
+                              median_method=median_method)
     weeks = sorted(vec["WeekKey"].dropna().unique())
     labels = vec.drop_duplicates("WeekKey").set_index("WeekKey")["CalendarWeek"]
     cols = ["WeekKey", "Week", "Modules", "Trained on", "Train n weeks", "Train weeks", *METHODS,
@@ -321,6 +326,45 @@ def backtest(vec: pd.DataFrame, limit: float, nominals: Nominals, window_weeks: 
     return out
 
 
+def _span(dates: pd.Series) -> str:
+    d0, d1 = pd.Timestamp(dates.min()), pd.Timestamp(dates.max())
+    return f"{d0:%b %d}" if d0.normalize() == d1.normalize() else f"{d0:%b %d} – {d1:%b %d}"
+
+
+def backtest_split(win: pd.DataFrame, limit: float, nominals: Nominals, min_train: int = 15, min_test: int = 10,
+                   sigma_xy: float = 0.10, sigma_yaw: float = 0.01, median_method: str = "median") -> pd.DataFrame:
+    """Out-of-sample check that never leaves the analysis window: the modules
+    of the window in time order, every method's setting learnt from the first
+    half and left unchanged on the second half (reported per week).
+
+    Use it when the line changes often: weeks before the window may come from
+    a different set-up, and learning from them says little about today."""
+    cols = ["WeekKey", "Week", "Modules", "Trained on", "Train n weeks", "Train weeks", "Test span", *METHODS,
+            *[f"{m} {k}" for m in METHODS for k in ("X", "Y", "Yaw")]]
+    d = win.dropna(subset=["Date"]).sort_values("Date", kind="stable")
+    half = len(d) // 2
+    train, test = d.iloc[:half], d.iloc[half:]
+    if len(train) < min_train or len(test) < min_test:
+        return pd.DataFrame(columns=cols)
+    sug = suggestions(train, limit, nominals, sigma_xy, sigma_yaw, median_method, fast=True)["settings"]
+    train_weeks = set(train["WeekKey"])
+    rows = []
+    for wk, t in test.groupby("WeekKey", sort=True):
+        label = str(t["CalendarWeek"].iloc[0]) + (" (part)" if wk in train_weeks else "")
+        row = {"WeekKey": int(wk), "Week": label, "Modules": len(t), "Trained on": len(train),
+               "Train n weeks": int(train["WeekKey"].nunique()), "Train weeks": _span(train["Date"]),
+               "Test span": _span(test["Date"])}
+        for m in METHODS:
+            st_ = sug.get(m)
+            row[m] = evaluate(t, st_, limit, nominals)["pass"] if st_ is not None else np.nan
+            for k, val in zip(("X", "Y", "Yaw"), st_ if st_ is not None else (np.nan,) * 3):
+                row[f"{m} {k}"] = val
+        rows.append(row)
+    out = pd.DataFrame(rows, columns=cols)
+    out.attrs["mode"] = "split"
+    return out
+
+
 def backtest_summary(bt: pd.DataFrame, mode: str | None = None) -> dict:
     if bt is None or bt.empty:
         return {}
@@ -331,10 +375,13 @@ def backtest_summary(bt: pd.DataFrame, mode: str | None = None) -> dict:
     if "Train weeks" in bt:
         out["train_label"] = str(bt["Train weeks"].iloc[0])
         out["train_weeks"] = int(bt["Train n weeks"].iloc[0])
+        out["train_n"] = int(bt["Trained on"].iloc[0])
+    if mode == "split" and "Test span" in bt:
+        out["label"] = str(bt["Test span"].iloc[0])
     for m in METHODS:
         if m in bt and bt[m].notna().all():
             out[m] = float(bt[m].sum() / n * 100)
-            if mode == "fixed" and f"{m} X" in bt:
+            if mode in ("fixed", "split") and f"{m} X" in bt:
                 out.setdefault("settings", {})[m] = tuple(float(bt[f"{m} {k}"].iloc[0]) for k in ("X", "Y", "Yaw"))
     present = [m for m in METHODS if m in out]
     out["best"] = max(present, key=lambda m: out[m]) if present else None
@@ -345,6 +392,10 @@ def backtest_text(bt_sum: dict) -> str:
     """How the backtest was run, in words (for captions and the readiness check)."""
     if not bt_sum:
         return ""
+    if bt_sum.get("mode") == "split":
+        return (f"learnt from the first half of the window ({bt_sum.get('train_label', '')}, "
+                f"{bt_sum.get('train_n', 0)} modules) and left unchanged on the second half "
+                f"({bt_sum['label']}, {bt_sum['n']} modules)")
     tested = f"{bt_sum['label']} ({_weeks(bt_sum['weeks'])}, {bt_sum['n']} modules)"
     if bt_sum.get("mode") == "rolling":
         return f"recalculated every week over {tested}"
@@ -427,7 +478,7 @@ def readiness(vec: pd.DataFrame, bt_sum: dict | None = None, recent_change: bool
                                 f"(need ≥ +{min_gain:.1f} pp)"})
     else:
         items.append({"check": "Helps in the backtest", "ok": False,
-                      "detail": "needs earlier weeks with enough modules to test on"})
+                      "detail": "not enough modules to run the backtest"})
     return items
 
 

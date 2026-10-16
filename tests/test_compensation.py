@@ -94,6 +94,22 @@ def test_backtest_and_readiness(vec):
     assert not checks["No recent process shift"]
 
 
+def test_window_split_backtest_stays_inside_the_window(vec):
+    weeks = sorted(vec["WeekKey"].unique())
+    win = vec[vec["WeekKey"].isin(weeks[-3:])]
+    bt = comp.backtest(win, LIMIT, NOM, window_weeks=3, mode="split")
+    s = comp.backtest_summary(bt, "split")
+    d = win.sort_values("Date", kind="stable")
+    first, second = d.iloc[:len(d) // 2], d.iloc[len(d) // 2:]
+    assert s["n"] == len(second) and s["train_n"] == len(first)       # every module used once, nothing outside
+    assert set(bt["WeekKey"]) <= set(weeks[-3:])
+    learnt = comp.suggestions(first, LIMIT, NOM, fast=True)["settings"]["Rigid fit (mean)"]
+    assert s["settings"]["Rigid fit (mean)"] == pytest.approx(learnt)
+    assert s["Rigid fit (mean)"] == pytest.approx(comp.evaluate(second, learnt, LIMIT, NOM)["fpy"])
+    assert comp.backtest_text(s).startswith("learnt from the first half of the window")
+    assert comp.backtest(win.head(20), LIMIT, NOM, mode="split").empty            # too few modules
+
+
 def test_backtest_fits_short_data():
     assert comp.auto_test_weeks(15, 6) == 8      # enough data: a full window and 8 test weeks
     assert comp.auto_test_weeks(7, 6) == 2       # 7 weeks: test on 2, learn from the 5 before
