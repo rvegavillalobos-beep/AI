@@ -110,8 +110,11 @@ X and Y. Every method is evaluated exactly on the modules (each corner re-judged
   the setting maximises the **expected FPY** when the line places each module with Gaussian noise (σ 0.10 mm in X/Y and
   0.01° in yaw by default), and the smallest move wins ties. It optimises what matters — modules in tolerance — rather
   than a central value.
-* **Backtest**: each of the last weeks gets the setting computed from the weeks before it, as if it had been used —
-  the honest, out-of-sample comparison of the methods.
+* **Backtest** (out of sample: no module ever helps compute the setting it is judged with), over the last 8 weeks:
+  * *Set once and left unchanged* (default — a permanent correction): each method's setting is computed once from the
+    N weeks before the test period and applied unchanged to every test week. A line that slopes down over the weeks
+    means the process is moving away from the setting.
+  * *Recalculated every week*: each test week gets a fresh setting from the N weeks just before it.
 * **Readiness**: enough modules and weeks, stable weekly placement (medians within 0.5 mm and 0.05°), no change point
   in the last two weeks, and a backtest gain of at least 1 pp. A paired bootstrap gives the uncertainty of the gain.
 

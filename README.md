@@ -129,7 +129,7 @@ The methods are described in [docs/methodology.md](docs/methodology.md). In shor
 module with Wilson intervals; group differences use Fisher's exact test, Welch's t-test and Brown–Forsythe;
 capability uses the moving-range σ for Cp/Cpk and the overall σ for Pp/Ppk; the error anatomy is an exact
 orthonormal decomposition of the eight deviations; the robust compensation maximises the expected FPY under the
-observed placement noise and is validated walk-forward.
+observed placement noise and is validated out of sample (set once and left, or recalculated weekly).
 
 ## Project layout
 
