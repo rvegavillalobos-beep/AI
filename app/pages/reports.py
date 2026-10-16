@@ -12,9 +12,7 @@ ui.page_header(c, "reports", "One click to the files you send: a formatted Excel
 ui.require(a.first)
 
 bundle = data.insight_bundle(c.key, a, c.ds)
-rb = data.remeasure_bundle(c.key, 120.0, a)
 extras = dict(bundle["extras"])
-extras["repeatability"] = rb["rep"]
 chosen = data.chosen_compensation()
 comp_rows, comp_offsets, comp_sims = data.compensation_export(a)
 comp_html = None
@@ -31,7 +29,7 @@ with left:
         st.markdown("##### Excel workbook")
         st.caption("Summary with key figures, findings and the action plan; weekly FPY; first runs and all runs with "
                    "out-of-tolerance cells in red; capability; failure mechanisms; squareness; vector drift; error "
-                   "budget; process shifts; SPC alarms; repeatability; interventions; data health.")
+                   "budget; process shifts; SPC alarms; interventions; data health.")
         title = st.text_input("Report title", key=state.init("p_rep_title", "ST020 corner deviation report"))
         if st.button("Prepare Excel", icon=":material/table_view:", key="rep_xlsx_go", width="stretch"):
             with st.spinner("Writing the workbook…"):

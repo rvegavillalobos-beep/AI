@@ -59,7 +59,7 @@ else:
     sections = {
         "Overview": [page("command", default=True)],
         "Analyze": [page("corners"), page("geometry"), page("shape"), page("drift"), page("anatomy")],
-        "Monitor": [page("spc"), page("patterns"), page("remeasure")] + ([page("height")] if context.ds.has_z else []),
+        "Monitor": [page("spc"), page("patterns")] + ([page("height")] if context.ds.has_z else []),
         "Improve": [page("target"), page("compensation"), page("events")],
         "Tools": [page("passport"), page("data"), page("reports")],
     }

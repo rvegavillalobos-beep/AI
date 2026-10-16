@@ -86,20 +86,12 @@ a χ² test of independence, the placement by group with Kruskal–Wallis. A *li
 between modules (at least 60 min); the first 3 modules after it are the *start-up* group, compared with the rest by
 Fisher's exact test (FPY) and Welch's test (placement).
 
-## 8. Re-measurement and MSA
-
-Consecutive runs of the same module less than 120 minutes apart are pairs of repeated measurements. Per type and
-coordinate: σ_repeat = robust SD(Δ) / √2 (SD from the MAD), **%GRR = 6 σ_repeat / tolerance width** (< 10 % good,
-10–30 % acceptable, > 30 % not acceptable). Taking a module out and re-seating it adds placement variation, so this is
-an upper bound for the gauge itself; a formal gauge R&R study gives the definitive number. The transition table shows
-how often a NOK becomes OK at the next run.
-
-## 9. Height (Z)
+## 8. Height (Z)
 
 With four corners the surface z = a + b·x + c·y + d·x·y (x, y relative to the nominal centre) fits exactly: level a,
 pitch b and roll c (mm per metre) and twist d (the part no plane follows).
 
-## 10. Compensation
+## 9. Compensation
 
 A compensation is a rigid move of the placement: rotation by the yaw about the nominal module centre, then a shift in
 X and Y. Every method is evaluated exactly on the modules (each corner re-judged against the tolerance).
@@ -116,7 +108,7 @@ X and Y. Every method is evaluated exactly on the modules (each corner re-judged
   in the last two weeks, and a clear gain: at least +1 pp in the window with the 90 % paired-bootstrap interval of the
   gain above 0.
 
-## 11. Path to target and the action plan
+## 10. Path to target and the action plan
 
 The levers act on the mode coefficients of your own Run 1 modules: optional compensation, then shrinking the spread
 of shift, yaw or shape around their means (and optionally removing the systematic shape). Every module is re-judged,
@@ -124,7 +116,7 @@ so no distribution is assumed. *Required reduction* finds by bisection the small
 target. The Command Center ranks actions by the FPY they are estimated to be worth this way; findings carry the test
 and p-value behind them.
 
-## 12. Interventions
+## 11. Interventions
 
 For a logged change: the 14 days before against the 14 days after (scope: the battery types it affects). FPY with
 Fisher's exact test, placement and corner means with Welch's test, spread with Brown–Forsythe. The verdict says

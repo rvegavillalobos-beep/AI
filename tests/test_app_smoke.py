@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-PAGES = ["command", "corners", "geometry", "shape", "drift", "anatomy", "spc", "patterns", "remeasure", "height",
+PAGES = ["command", "corners", "geometry", "shape", "drift", "anatomy", "spc", "patterns", "height",
          "target", "compensation", "events", "passport", "data", "reports"]
 
 

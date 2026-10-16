@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from rickhard import analysis, compensation, demo, geometry, improvement, insights, loading, remeasure, spc
+from rickhard import analysis, compensation, demo, geometry, improvement, insights, loading, spc
 from rickhard import events as ev_mod
 from rickhard.analysis import Analysis
 from rickhard.config import LoadOptions, Scope, Settings
@@ -145,18 +145,9 @@ def alarms(key: str, recent_days: int, _a: Analysis) -> pd.DataFrame:
     return spc.alarm_board(_a.first, vars_, recent_days=recent_days)
 
 
-@st.cache_data(max_entries=24, show_spinner=False)
-def remeasure_bundle(key: str, max_gap: float, _a: Analysis) -> dict:
-    pairs = remeasure.run_pairs(_a.runs)
-    rep = remeasure.repeatability(pairs, _a.settings.rules.spec_limit, max_gap)
-    return {"pairs": pairs, "rep": rep, "transitions": remeasure.transitions(pairs),
-            "summary": remeasure.summary(pairs, rep)}
-
-
 @st.cache_data(max_entries=24, show_spinner="Reading the data for findings…")
 def insight_bundle(key: str, _a: Analysis, _ds: Dataset) -> dict:
-    return insights.bundle(_a, _ds.health, alarms=alarms(key, 14, _a), change_points=change_points(key, _a)["table"],
-                           remeasure_summary=remeasure_bundle(key, 120.0, _a)["summary"])
+    return insights.bundle(_a, _ds.health, alarms=alarms(key, 14, _a), change_points=change_points(key, _a)["table"])
 
 
 @st.cache_data(max_entries=48, show_spinner="Searching the best compensation…")

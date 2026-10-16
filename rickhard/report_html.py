@@ -48,7 +48,7 @@ def _build(a, insights, actions, events, comp_rows, title, offline, note) -> str
     color = "#0ca30c" if gap >= 0 else ("#c98500" if gap > -5 else "#d03b3b")
     tiles = [
         ("First-pass yield", f"{k['fpy']:.1f}%", f"{gap:+.1f} pp vs {r.fpy_target:g}% target · CI {lo:.1f}–{hi:.1f}%", color),
-        ("Modules", f"{k['modules']:,}", f"{k['runs']:,} runs · {k['remeasured']:,} re-measured", None),
+        ("Modules", f"{k['modules']:,}", f"{k['runs']:,} runs · {k['remeasured']:,} re-measured after rework", None),
         ("NOK at first measurement", f"{k['fail']:,}", f"{k['near_miss']} near misses", None),
     ]
     if "last_week" in k:

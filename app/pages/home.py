@@ -39,7 +39,6 @@ st.html("""
   <div><b>SPC Monitor</b>I-MR and weekly charts with run rules, and dated process shifts found automatically.</div>
   <div><b>Interventions</b>Log what was changed on the line and get a before / after verdict with statistics.</div>
   <div><b>Time Patterns</b>Shift, weekday × hour and start-up after line stops.</div>
-  <div><b>Re-measurement & MSA</b>What re-measuring tells you about repeatability (%GRR) from production data.</div>
   <div><b>Corner Lab · Geometry · Shape</b>Targets per corner, capability (Cp/Cpk/Pp/Ppk), module outlines, the
   drift movie, squareness and its link to NOK — everything the original app had, deeper.</div>
 </div>

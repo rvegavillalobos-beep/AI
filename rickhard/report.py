@@ -134,7 +134,7 @@ def build_excel(a, insights=None, actions=None, extras: dict | None = None, heal
         ("Gap to target", k.get("gap"), "pp"),
         ("Modules (first run)", k.get("modules"), ""),
         ("Measurement runs", k.get("runs"), ""),
-        ("Modules re-measured", k.get("remeasured"), ""),
+        ("Modules re-measured after rework", k.get("remeasured"), ""),
         ("NOK at first measurement", k.get("fail"), ""),
         ("Incomplete first runs (kept apart)", k.get("incomplete"), ""),
         ("Near misses (pass with < margin)", k.get("near_miss"), f"< {r.near_miss:g} mm"),
@@ -228,8 +228,6 @@ def build_excel(a, insights=None, actions=None, extras: dict | None = None, heal
         _sheet(wb, "Process shifts", ex["change_points"], number_format="0.000")
     if ex.get("alarms") is not None:
         _sheet(wb, "SPC alarms", ex["alarms"], number_format="0.000")
-    if ex.get("repeatability") is not None:
-        _sheet(wb, "Repeatability (MSA)", ex["repeatability"], number_format="0.000")
     if events is not None and len(events):
         _sheet(wb, "Interventions", events.drop(columns=["WeekKey"], errors="ignore"))
     if health:

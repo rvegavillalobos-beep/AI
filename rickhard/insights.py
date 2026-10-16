@@ -14,7 +14,7 @@ import pandas as pd
 
 from . import compensation as comp
 from . import improvement as imp
-from . import metrics, patterns, remeasure, spc
+from . import metrics, patterns, spc
 from .analysis import Analysis
 from .constants import MODE_LABELS
 from .stats import fisher_2x2, significance_label
@@ -307,19 +307,6 @@ def generate(a: Analysis, extras: dict | None = None) -> tuple[list[Insight], li
             "startup", action="Investigate the first cycles after stops (warm-up, end-stop damping, first-part routine)",
             impact=impact, page="patterns", score=13 + impact))
 
-    # 14 — measurement
-    rm = ex.get("remeasure") or {}
-    if rm.get("max_grr") is not None and np.isfinite(rm["max_grr"]):
-        lvl = "bad" if rm["max_grr"] >= 30 else ("warn" if rm["max_grr"] >= 10 else "good")
-        nok_ok = rm.get("nok_to_ok_rate", np.nan)
-        out.append(Insight(
-            lvl, "Measurement repeatability",
-            f"Measuring the same module twice moves a corner by σ≈{rm['median_sigma']:.2f} mm; "
-            f"%GRR up to **{rm['max_grr']:.0f}%** ({rm['worst_coord']}). "
-            + (f"{nok_ok:.0f}% of re-measured NOK modules passed the second time." if np.isfinite(nok_ok) else ""),
-            "msa", action="Run a formal gauge R&R study on the station" if lvl == "bad" else None,
-            page="remeasure", score=LEVEL_WEIGHT[lvl] * 8))
-
     # 15 — data quality
     h = ex.get("health") or {}
     inc = int((f["MissingCorners"] > 0).sum()) if "MissingCorners" in f else 0
@@ -339,7 +326,7 @@ def generate(a: Analysis, extras: dict | None = None) -> tuple[list[Insight], li
 
     # ---- action plan ---------------------------------------------------------------
     owners = {"placement": "Process / maintenance", "startup": "Process", "shift": "Production",
-              "msa": "Quality", "data": "Quality / IT"}
+              "data": "Quality / IT"}
     for i in out:
         if i.action:
             actions.append(Action(i.action, i.title, i.impact, owners.get(i.topic, "Process"), i.page))
@@ -356,7 +343,7 @@ def generate(a: Analysis, extras: dict | None = None) -> tuple[list[Insight], li
 
 
 def bundle(a: Analysis, health: dict | None = None, *, alarms: pd.DataFrame | None = None,
-           change_points: pd.DataFrame | None = None, remeasure_summary: dict | None = None) -> dict:
+           change_points: pd.DataFrame | None = None) -> dict:
     """Findings, action plan and the evidence behind them for one analysis.
 
     The optional arguments let a caller pass pieces it has already computed
@@ -376,10 +363,6 @@ def bundle(a: Analysis, health: dict | None = None, *, alarms: pd.DataFrame | No
     extras["change_points"] = change_points
     extras["shift_effect"] = shift_effect(f)
     extras["startup"] = patterns.startup_effect(f, patterns.suggest_stop_gap(f))
-    if remeasure_summary is None:
-        pairs = remeasure.run_pairs(a.runs)
-        remeasure_summary = remeasure.summary(pairs, remeasure.repeatability(pairs, rules.spec_limit, 120.0))
-    extras["remeasure"] = remeasure_summary
     comps = {t: s["setting"] for t, s in extras["placement"].items()}
     extras["levers"] = lever_gains(a, comps)
     ins, acts = generate(a, extras)

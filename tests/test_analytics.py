@@ -1,13 +1,12 @@
-"""Statistics, SPC, patterns, re-measurement, what-if and the demo's process story."""
+"""Statistics, SPC, patterns, what-if and the demo's process story."""
 
 import numpy as np
 import pandas as pd
 import pytest
 from scipy import stats as sps
 
-from rickhard import demo, events, improvement, insights, metrics, patterns, remeasure, spc, stats
+from rickhard import demo, events, improvement, insights, metrics, patterns, spc, stats
 from rickhard.config import Nominals
-from rickhard.constants import DEV_COLS
 
 NOM = Nominals()
 
@@ -110,7 +109,7 @@ def test_alarm_board_is_quiet_on_a_stable_process_and_fires_on_a_recent_shift():
 
 
 # ---------------------------------------------------------------------------
-# Patterns, re-measurement, what-if, interventions
+# Patterns, what-if, interventions
 # ---------------------------------------------------------------------------
 
 def test_startup_flags():
@@ -118,24 +117,6 @@ def test_startup_flags():
                         "2026-07-01 09:00", "2026-07-01 09:04", "2026-07-01 09:08"])
     f = patterns.startup_flags(pd.DataFrame({"Date": t}), gap_min=60, k=2)
     assert list(f) == [True, True, False, False, True, True, False]
-
-
-def test_repeatability_recovers_the_measurement_noise():
-    rng = np.random.default_rng(4)
-    n, sigma_e = 400, 0.2
-    truth = rng.normal(0, 1, (n, 8))
-    rows = []
-    for i in range(n):
-        for run in (1, 2):
-            d = truth[i] + rng.normal(0, sigma_e, 8)
-            rows.append({"PartID": f"P{i}", "RunNum": run, "BatteryType": "Type S",
-                         "Date": pd.Timestamp("2026-07-01") + pd.Timedelta(minutes=10 * i + 5 * run),
-                         "Status": "PASS", "WorstAbs": 0.0, **dict(zip(DEV_COLS, d))})
-    pairs = remeasure.run_pairs(pd.DataFrame(rows))
-    rep = remeasure.repeatability(pairs, 3.0)
-    assert len(rep) == 8
-    assert rep["SigmaRepeat"].median() == pytest.approx(sigma_e, rel=0.12)
-    assert rep["GRR"].median() == pytest.approx(6 * sigma_e / 6 * 100, rel=0.12)
 
 
 def test_levers(demo_analysis):
@@ -184,15 +165,13 @@ def test_demo_patterns(bundle):
     assert se["worst"] == "C" and se["axis"] == "Y" and se["p_mean"] < 1e-6
     su = bundle["extras"]["startup"]
     assert su["fpy_startup"] < su["fpy_steady"] and su["p_value"] < 0.01
-    rm = bundle["extras"]["remeasure"]
-    assert 15 < rm["max_grr"] < 50 and rm["nok_to_ok"] > 0
 
 
 def test_demo_findings_and_actions(bundle):
     ins, acts = bundle["insights"], bundle["actions"]
     assert {i.level for i in ins} <= {"good", "info", "warn", "bad"}
     topics = {i.topic for i in ins}
-    assert {"fpy", "mechanism", "msa", "startup", "shift", "change"} <= topics
+    assert {"fpy", "mechanism", "startup", "shift", "change"} <= topics
     scores = [i.score for i in ins]
     assert scores == sorted(scores, reverse=True)
     impacts = [a.impact for a in acts if a.impact is not None]

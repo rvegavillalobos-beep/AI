@@ -1,4 +1,4 @@
-"""Re-measurement / repeatability and height (Z) figures."""
+"""Height (Z) figures."""
 
 from __future__ import annotations
 
@@ -11,82 +11,6 @@ from ..constants import CORNER_LABELS, CORNERS
 from ..geometry import polygon
 from . import theme as T
 
-
-def transition_heatmap(tr: pd.DataFrame, title: str | None = None, height: int = 300) -> go.Figure:
-    P = T.pal()
-    if tr is None or tr.empty:
-        return T.empty("No re-measured modules.")
-    z = tr.to_numpy(float)
-    rows = z.sum(axis=1, keepdims=True)
-    pct = z / np.where(rows == 0, 1, rows) * 100
-    text = [[f"<b>{int(v)}</b> · {p:.0f}%" for v, p in zip(row, prow)] for row, prow in zip(z, pct)]
-    short = {"INCOMPLETE": "INCOMPL."}
-    fig = go.Figure(go.Heatmap(z=pct, x=[short.get(c, c) for c in tr.columns], y=[short.get(r, r) for r in tr.index],
-                               text=text, texttemplate="%{text}", textfont=dict(size=13), colorscale=P.seq_light,
-                               zmin=0, zmax=100, showscale=False, xgap=3, ygap=3,
-                               hovertemplate="run 1 %{y} → next run %{x}: %{z:.0f}% of the row<extra></extra>"))
-    fig.update_yaxes(autorange="reversed", title_text="Status at run 1")
-    fig.update_xaxes(title_text="Status at the next run", tickangle=0, side="bottom")
-    return T.style(fig, height=height, title=title, legend=False)
-
-
-def grr_bars(rep: pd.DataFrame, title: str | None = None, height: int = 340) -> go.Figure:
-    P = T.pal()
-    if rep is None or rep.empty:
-        return T.empty("Needs modules measured twice within a short time.")
-    fig = go.Figure()
-    for t in [x for x in ("Type S", "Type M") if (rep["BatteryType"] == x).any()]:
-        s = rep[rep["BatteryType"] == t]
-        fig.add_trace(go.Bar(x=s["Coord"].str.replace("_", " "), y=s["GRR"], name=t, marker_color=P.type(t),
-                             customdata=np.stack([s["SigmaRepeat"], s["N"]], axis=1),
-                             hovertemplate="<b>%{x}</b> · " + t + "<br>%GRR %{y:.1f}%<br>σ repeat %{customdata[0]:.3f} mm"
-                                           " (n=%{customdata[1]})<extra></extra>"))
-    T.hline(fig, 10, P.target, "dot", 1.5, "10% good", "top right")
-    T.hline(fig, 30, P.limit, "dash", 1.5, "30% not acceptable", "top right")
-    fig.update_layout(barmode="group", bargap=0.3, bargroupgap=0.08)
-    fig.update_yaxes(title_text="%GRR (6σ / tolerance)", ticksuffix="%", rangemode="tozero",
-                     range=[0, max(35.0, float(rep["GRR"].max()) * 1.15)])
-    return T.style(fig, height=height, title=title)
-
-
-def bland_altman(pairs: pd.DataFrame, coord: str, max_gap: float, title: str | None = None, height: int = 360) -> go.Figure:
-    P = T.pal()
-    p = pairs[pairs["GapMin"] <= max_gap]
-    a, b = p[f"a_{coord}"].to_numpy(float), p[f"b_{coord}"].to_numpy(float)
-    m = np.isfinite(a) & np.isfinite(b)
-    if m.sum() < 5:
-        return T.empty("Not enough pairs.")
-    mean, diff = (a[m] + b[m]) / 2, b[m] - a[m]
-    md, sd = float(diff.mean()), float(diff.std(ddof=1))
-    fig = go.Figure(go.Scatter(x=mean, y=diff, mode="markers", marker=dict(size=7, color=T.rgba(P.accent, 0.6)),
-                               customdata=np.stack([p.loc[m, "PartID"].astype(object).map(str), p.loc[m, "GapMin"]], axis=1),
-                               hovertemplate="%{customdata[0]}<br>mean %{x:+.2f} · Δ %{y:+.2f} mm<br>"
-                                             "%{customdata[1]:.0f} min apart<extra></extra>", showlegend=False))
-    T.hline(fig, md, P.ink["primary"], "solid", 1.5, f"bias {md:+.3f}", "top left")
-    T.hline(fig, md + 1.96 * sd, P.limit, "dash", 1.2, f"+1.96σ {md + 1.96 * sd:+.2f}", "top left")
-    T.hline(fig, md - 1.96 * sd, P.limit, "dash", 1.2, f"−1.96σ {md - 1.96 * sd:+.2f}", "bottom left")
-    fig.update_xaxes(title_text=f"Mean of the two runs — {coord.replace('_', ' ')} (mm)")
-    fig.update_yaxes(title_text="Second run − first run (mm)")
-    return T.style(fig, height=height, title=title, legend=False)
-
-
-def gap_hist(pairs: pd.DataFrame, max_gap: float, title: str | None = None, height: int = 260) -> go.Figure:
-    P = T.pal()
-    if pairs is None or pairs.empty:
-        return T.empty("No re-measurements.")
-    g = pairs["GapMin"].clip(upper=24 * 60)
-    fig = go.Figure(go.Histogram(x=g, nbinsx=48, marker_color=P.accent, showlegend=False,
-                                 hovertemplate="%{x} min: %{y} pairs<extra></extra>"))
-    fig.add_vline(x=max_gap, line=dict(color=P.ink["primary"], dash="dash"),
-                  annotation_text=f"{max_gap:.0f} min", annotation_font=dict(size=10, color=P.ink["secondary"]))
-    fig.update_xaxes(title_text="Minutes between runs (cap 24 h)")
-    fig.update_yaxes(title_text="Pairs")
-    return T.style(fig, height=height, title=title, legend=False)
-
-
-# ---------------------------------------------------------------------------
-# Height (Z)
-# ---------------------------------------------------------------------------
 
 def z_surface(surf: dict, bat_type: str, title: str | None = None, height: int = 330) -> go.Figure:
     """Top view of the average module surface: colour = fitted height Z,

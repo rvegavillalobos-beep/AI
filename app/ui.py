@@ -17,7 +17,7 @@ from rickhard.constants import DEV_COLS
 PAGE_ICONS = {
     "command": ":material/space_dashboard:", "corners": ":material/crop_free:", "geometry": ":material/view_in_ar:",
     "shape": ":material/square_foot:", "drift": ":material/moving:", "anatomy": ":material/biotech:",
-    "spc": ":material/monitor_heart:", "patterns": ":material/schedule:", "remeasure": ":material/replay:",
+    "spc": ":material/monitor_heart:", "patterns": ":material/schedule:",
     "height": ":material/height:", "target": ":material/flag:", "compensation": ":material/tune:",
     "events": ":material/event_note:", "passport": ":material/badge:", "data": ":material/dataset:",
     "reports": ":material/summarize:",
@@ -25,7 +25,7 @@ PAGE_ICONS = {
 PAGE_TITLES = {
     "command": "Command Center", "corners": "Corner Lab", "geometry": "Geometry", "shape": "Shape & Squareness",
     "drift": "Drift & Yaw", "anatomy": "Error Anatomy", "spc": "SPC Monitor", "patterns": "Time Patterns",
-    "remeasure": "Re-measurement & MSA", "height": "Height (Z)", "target": "Path to Target",
+    "height": "Height (Z)", "target": "Path to Target",
     "compensation": "Compensation Studio", "events": "Interventions", "passport": "Module Passport",
     "data": "Data & Settings", "reports": "Reports",
 }

@@ -23,7 +23,7 @@ import streamlit as st  # noqa: E402  (the stub)
 
 assert hasattr(st, "run_app"), "the Streamlit stub was not picked up"
 
-PAGES = ["command", "corners", "geometry", "shape", "drift", "anatomy", "spc", "patterns", "remeasure", "height",
+PAGES = ["command", "corners", "geometry", "shape", "drift", "anatomy", "spc", "patterns", "height",
          "target", "compensation", "events", "passport", "data", "reports"]
 
 

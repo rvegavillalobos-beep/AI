@@ -101,7 +101,6 @@ small project file and loaded again later.
 | | **Error Anatomy** | The eight-mode decomposition: error budget (systematic vs random), data-driven modes (PCA), which modes drive NOK, weekly mode trends. |
 | Monitor | **SPC Monitor** | Alarm board (recent window vs baseline), I-MR and weekly X̄ charts with Nelson rules. |
 | | **Time Patterns** | Shifts, weekday × hour, and the first modules after the line stood still. |
-| | **Re-measurement & MSA** | %GRR per corner coordinate estimated from production re-measurements; how often a NOK turns OK on the next run. |
 | | **Height (Z)** | Level, pitch, roll and twist of every module (shown when the export contains Z). |
 | Improve | **Path to Target** | What-if levers: how much offset and scatter must go to reach the FPY target, with a sensitivity chart. |
 | | **Compensation Studio** | Median, rigid-fit, robust and your own X / Y / yaw compared in-window, with a safety margin and the bootstrap interval of the gain, FPY maps over X / Y and yaw, readiness checklist, work instruction, piece-level simulation. |
@@ -141,7 +140,7 @@ rickhard/             analytics package — no Streamlit imports, every number t
   analysis.py         the pipeline: runs → first runs → status, FPY, squareness, anatomy
   geometry.py         rigid fit and the eight-mode error decomposition
   compensation.py     median / rigid / robust compensation, gain uncertainty, readiness
-  spc.py, patterns.py, remeasure.py, zheight.py, events.py, improvement.py, insights.py
+  spc.py, patterns.py, zheight.py, events.py, improvement.py, insights.py
   report.py, report_html.py   Excel and HTML reports
   charts/             Plotly figures (colour-blind-safe palette, light and dark)
 tests/                pytest suite, the original app's logic for parity checks, page smoke test

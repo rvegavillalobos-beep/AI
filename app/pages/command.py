@@ -31,7 +31,7 @@ if "last_week" in k:
                   "delta": f"{diff:+.1f} pp vs the 4 weeks before" if np.isfinite(diff) else None,
                   "good": bool(diff >= 0) if np.isfinite(diff) else None, "sub": ui.plural(int(k['last_week_n']), "module")})
 cards.append({"label": "Modules (first run)", "value": f"{n:,}",
-              "sub": f"{k['runs']:,} runs · {k['remeasured']:,} re-measured"})
+              "sub": f"{k['runs']:,} runs · {k['remeasured']:,} re-measured after rework"})
 nok = k["fail"] + (0 if r.incomplete_as_fail else k["incomplete"])
 cards.append({"label": "NOK at first measurement", "value": f"{nok:,}",
               "sub": f"{nok / n * 100:.1f}% of modules · **{k['near_miss']}** near misses"})

@@ -4,7 +4,7 @@ import streamlit as st
 
 from app import data, state, ui
 from rickhard import zheight
-from rickhard.charts import msa_charts as cm
+from rickhard.charts import height_charts as cm
 from rickhard.constants import Z_COLS
 
 c = data.ctx()
