@@ -94,6 +94,25 @@ def test_backtest_and_readiness(vec):
     assert not checks["No recent process shift"]
 
 
+def test_backtest_fits_short_data():
+    assert comp.auto_test_weeks(15, 6) == 8      # enough data: a full window and 8 test weeks
+    assert comp.auto_test_weeks(7, 6) == 2       # 7 weeks: test on 2, learn from the 5 before
+    assert comp.auto_test_weeks(7, 3) == 4       # a shorter window leaves more weeks to test on
+    assert comp.auto_test_weeks(2, 6) == 1 and comp.auto_test_weeks(1, 6) == 0
+
+
+def test_backtest_on_seven_weeks(vec):
+    weeks = sorted(vec["WeekKey"].unique())
+    assert len(weeks) >= 7
+    v7 = vec[vec["WeekKey"].isin(weeks[-7:])]
+    bt = comp.backtest(v7, LIMIT, NOM, window_weeks=6, mode="fixed")
+    s = comp.backtest_summary(bt, "fixed")
+    assert s["weeks"] == 2 and s["train_weeks"] == 5
+    assert "(5 weeks)" in comp.backtest_text(s) and "(2 weeks," in comp.backtest_text(s)
+    bt6 = comp.backtest(v7, LIMIT, NOM, window_weeks=6, test_weeks=6, mode="fixed")
+    assert len(bt6) == 6 and (bt6["Train n weeks"] == 1).all()
+
+
 def test_set_once_backtest_never_updates_the_setting(vec):
     fixed = comp.backtest(vec, LIMIT, NOM, window_weeks=3, test_weeks=4, mode="fixed")
     rolling = comp.backtest(vec, LIMIT, NOM, window_weeks=3, test_weeks=4, mode="rolling")

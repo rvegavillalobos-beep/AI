@@ -110,7 +110,8 @@ X and Y. Every method is evaluated exactly on the modules (each corner re-judged
   the setting maximises the **expected FPY** when the line places each module with Gaussian noise (σ 0.10 mm in X/Y and
   0.01° in yaw by default), and the smallest move wins ties. It optimises what matters — modules in tolerance — rather
   than a central value.
-* **Backtest** (out of sample: no module ever helps compute the setting it is judged with), over the last 8 weeks:
+* **Backtest** (out of sample: no module ever helps compute the setting it is judged with), over the last weeks
+  (Auto: what is left after a full N-week window, at least 2 and at most 8; or a number you choose):
   * *Set once and left unchanged* (default — a permanent correction): each method's setting is computed once from the
     N weeks before the test period and applied unchanged to every test week. A line that slopes down over the weeks
     means the process is moving away from the setting.

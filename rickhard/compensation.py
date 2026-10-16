@@ -251,10 +251,21 @@ def suggestions(vec: pd.DataFrame, limit: float, nominals: Nominals, sigma_xy: f
 BACKTEST_MODES = ("fixed", "rolling")
 
 
+def auto_test_weeks(n_weeks: int, window_weeks: int, most: int = 8) -> int:
+    """How many of the last weeks to test on when the user does not say: the
+    weeks left after a full window, at least 2 and at most ``most``, always
+    leaving at least one earlier week to learn from."""
+    if n_weeks < 2:
+        return 0
+    return int(min(n_weeks - 1, max(2, min(most, n_weeks - window_weeks))))
+
+
 def backtest(vec: pd.DataFrame, limit: float, nominals: Nominals, window_weeks: int = 6,
-             test_weeks: int = 8, min_train: int = 15, sigma_xy: float = 0.10,
+             test_weeks: int | None = None, min_train: int = 15, sigma_xy: float = 0.10,
              sigma_yaw: float = 0.01, median_method: str = "median", mode: str = "fixed") -> pd.DataFrame:
-    """Replay the last ``test_weeks`` weeks as if each method had been in use.
+    """Replay the last ``test_weeks`` weeks as if each method had been in use
+    (``None``: :func:`auto_test_weeks`). The settings are learnt from up to
+    ``window_weeks`` weeks before them — fewer when the data is short.
 
     ``mode="fixed"`` (set once and left): every method's setting is computed
     ONCE from the ``window_weeks`` before the first test week and then left
@@ -266,11 +277,12 @@ def backtest(vec: pd.DataFrame, limit: float, nominals: Nominals, window_weeks: 
     """
     weeks = sorted(vec["WeekKey"].dropna().unique())
     labels = vec.drop_duplicates("WeekKey").set_index("WeekKey")["CalendarWeek"]
-    cols = ["WeekKey", "Week", "Modules", "Trained on", "Train weeks", *METHODS,
+    cols = ["WeekKey", "Week", "Modules", "Trained on", "Train n weeks", "Train weeks", *METHODS,
             *[f"{m} {k}" for m in METHODS for k in ("X", "Y", "Yaw")]]
-    test = weeks[-test_weeks:]
-    if mode == "fixed" and test and test[0] == weeks[0]:
-        test = test[1:]                        # the first week has nothing before it to learn from
+    k = auto_test_weeks(len(weeks), window_weeks) if not test_weeks else min(int(test_weeks), len(weeks) - 1)
+    if k < 1:
+        return pd.DataFrame(columns=cols)
+    test = weeks[-k:]                          # at least one earlier week is always left to learn from
 
     def train_on(prior):
         train = vec[vec["WeekKey"].isin(prior)]
@@ -295,6 +307,7 @@ def backtest(vec: pd.DataFrame, limit: float, nominals: Nominals, window_weeks: 
         if sug is None or t.empty:
             continue
         row = {"WeekKey": int(wk), "Week": labels.get(wk, str(wk)), "Modules": len(t), "Trained on": len(train),
+               "Train n weeks": len(prior),
                "Train weeks": (f"{labels.get(prior[0], prior[0])} – {labels.get(prior[-1], prior[-1])}"
                                if len(prior) > 1 else str(labels.get(prior[0], prior[0])))}
         for m in METHODS:
@@ -317,6 +330,7 @@ def backtest_summary(bt: pd.DataFrame, mode: str | None = None) -> dict:
            "label": f"{bt['Week'].iloc[0]} – {bt['Week'].iloc[-1]}" if len(bt) > 1 else str(bt["Week"].iloc[0])}
     if "Train weeks" in bt:
         out["train_label"] = str(bt["Train weeks"].iloc[0])
+        out["train_weeks"] = int(bt["Train n weeks"].iloc[0])
     for m in METHODS:
         if m in bt and bt[m].notna().all():
             out[m] = float(bt[m].sum() / n * 100)
@@ -331,10 +345,15 @@ def backtest_text(bt_sum: dict) -> str:
     """How the backtest was run, in words (for captions and the readiness check)."""
     if not bt_sum:
         return ""
+    tested = f"{bt_sum['label']} ({_weeks(bt_sum['weeks'])}, {bt_sum['n']} modules)"
     if bt_sum.get("mode") == "rolling":
-        return f"recalculated every week over {bt_sum['label']} ({bt_sum['n']} modules)"
-    return (f"set once from {bt_sum.get('train_label', 'the weeks before')} and left unchanged over "
-            f"{bt_sum['label']} ({bt_sum['n']} modules)")
+        return f"recalculated every week over {tested}"
+    return (f"set once from {bt_sum.get('train_label', 'the weeks before')} ({_weeks(bt_sum.get('train_weeks', 0))}) "
+            f"and left unchanged over {tested}")
+
+
+def _weeks(n: int) -> str:
+    return f"{n} week" + ("" if n == 1 else "s")
 
 
 # ---------------------------------------------------------------------------

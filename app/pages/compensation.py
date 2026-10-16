@@ -58,8 +58,18 @@ with ctl[3]:
                             help="Set once: each method's setting is computed from the N weeks before the test "
                                  "period and then left alone for all the test weeks — a permanent correction. "
                                  "Recalculated: every test week gets a fresh setting from the N weeks before it.")
+        auto_k = comp.auto_test_weeks(n_weeks_avail, int(weeks))
+        k_opts = ["Auto", *range(1, max(2, n_weeks_avail))]
+        state.ensure_option("p_cp_btweeks", k_opts, "Auto")
+        k_opt = st.select_slider("Backtest: weeks to test on", k_opts, key="p_cp_btweeks",
+                                 format_func=lambda o: f"Auto ({auto_k})" if o == "Auto" else str(o),
+                                 help="The last weeks of the sidebar range that the backtest judges. The settings "
+                                      "are learnt from up to N weeks before them (Last N weeks) — fewer if the data "
+                                      "does not reach that far back. Auto keeps a full window when it can and tests "
+                                      "on at least 2 and at most 8 weeks.")
 method_key = "mean" if mname == "Mean" else "median"
 bt_mode = bt_opts[bt_label]
+bt_k = None if k_opt == "Auto" else int(k_opt)
 
 v = data.window(a, t, int(weeks))
 ui.require(v)
@@ -105,7 +115,7 @@ with st.expander("Manual values — try your own X / Y / yaw", icon=":material/e
 settings["Manual"] = (float(st.session_state[kx]), float(st.session_state[ky]), float(st.session_state[kyaw]))
 
 # ---- Methods table -------------------------------------------------------------------------------
-bt = data.backtest(c.key, t, int(weeks), float(sigma), float(sigma_yaw), method_key, a, bt_mode)
+bt = data.backtest(c.key, t, int(weeks), float(sigma), float(sigma_yaw), method_key, a, bt_mode, bt_k)
 bts = comp.backtest_summary(bt, bt_mode)
 once = bt_mode == "fixed"
 rows = []
@@ -257,6 +267,10 @@ if bts:
     best = bts.get("best")
     st.caption(f"{comp.backtest_text(bts)[0].upper()}{comp.backtest_text(bts)[1:]}: **{best}** did best, "
                f"{bts.get(best, np.nan):.1f}% vs {bts.get('No compensation', np.nan):.1f}% without correction.")
+    if once and bts.get("train_weeks", int(weeks)) < int(weeks):
+        st.caption(f":orange[The data has {n_weeks_avail} weeks: to keep {bts['weeks']} for testing, the settings "
+                   f"were learnt from {bts['train_weeks']} instead of {int(weeks)}. Fewer test weeks (More → "
+                   f"Backtest: weeks to test on) leave more to learn from.]")
     if once and bts.get("settings"):
         st.caption("Settings used: " + " · ".join(
             f"{m} X {x:+.2f} · Y {y:+.2f} · yaw {w:+.3f}°" for m, (x, y, w) in bts["settings"].items()
