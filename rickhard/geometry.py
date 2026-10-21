@@ -370,6 +370,41 @@ def _corner_angle(a, b, c):
 SQ_COLUMNS = ["Diag1", "Diag2", "DeltaDiag", "WidthDelta", "LengthDelta", "AngleDevFL",
               "SquarenessStatus", "RootCause", "CauseCategory"]
 
+# the six distances of a module, as pairs of corner indices into CORNERS (FL, FR, RL, RR)
+DIMENSIONS: dict[str, tuple[int, int]] = {
+    "Diag FL–RR": (0, 3), "Diag FR–RL": (1, 2),
+    "Front FL–FR": (0, 1), "Rear RL–RR": (2, 3),
+    "Left FL–RL": (0, 2), "Right FR–RR": (1, 3),
+}
+
+
+def dimension_deviations(df: pd.DataFrame, nominals: Nominals) -> pd.DataFrame:
+    """Measured minus nominal length (mm) of both diagonals and the four edges
+    of every complete run, plus the corner angles' deviations (°).
+
+    These distances do not depend on where the module was placed, only on its
+    shape: a perfectly square module reads 0 everywhere."""
+    cols = [*DIMENSIONS, "Diagonal difference", *[f"Angle {c}" for c in CORNERS]]
+    out = pd.DataFrame(np.nan, index=df.index, columns=cols)
+    if df.empty:
+        return out
+    nx, ny = nominal_xy(df["BatteryType"], nominals)
+    D = dev_matrix(df)
+    ax, ay = nx + D[:, 0::2], ny + D[:, 1::2]
+    for name, (i, j) in DIMENSIONS.items():
+        out[name] = _dist(ax[:, i], ay[:, i], ax[:, j], ay[:, j]) - _dist(nx[:, i], ny[:, i], nx[:, j], ny[:, j])
+    out["Diagonal difference"] = out["Diag FL–RR"] - out["Diag FR–RL"]
+    # each corner's angle between its two edges (FL: to FR and RL, FR: to FL and RR, …)
+    nb = {0: (1, 2), 1: (0, 3), 2: (0, 3), 3: (1, 2)}
+    for k, c in enumerate(CORNERS):
+        p, q = nb[k]
+
+        def ang(x, y, k=k, p=p, q=q):
+            return _corner_angle((x[:, k], y[:, k]), (x[:, p], y[:, p]), (x[:, q], y[:, q]))
+        out[f"Angle {c}"] = ang(ax, ay) - ang(nx, ny)
+    out.loc[np.isnan(D).any(axis=1), :] = np.nan     # a module with a missing corner has no shape to measure
+    return out
+
 
 def squareness(df: pd.DataFrame, diag_tol: float, nominals: Nominals) -> pd.DataFrame:
     """Deformation metrics for complete runs (incomplete runs are dropped).

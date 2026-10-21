@@ -4,6 +4,9 @@ import streamlit as st
 from app import data, state, ui
 from rickhard import metrics
 from rickhard.charts import shape as cs
+from rickhard.charts import svg
+from rickhard.constants import CORNERS
+from rickhard.geometry import DIMENSIONS, dimension_deviations, split_rigid_shape
 from rickhard.stats import significance_label
 
 c = data.ctx()
@@ -116,8 +119,9 @@ with st.expander("How this is worked out", icon=":material/help:"):
         "chance.\n"
         "- Only modules with all four corners measured are included.")
 
-ui.section("Squareness report", "Original table plus why each NOK failed. Select a row to focus that module in "
-                                "Geometry and Module Passport.")
+ui.section("Squareness report", "Original table plus why each NOK failed. Select rows to compare those modules "
+                                "with the nominal below (one selected row also becomes the focus in Geometry and "
+                                "Module Passport).")
 scopes = ["First runs", "All runs"]
 state.ensure_option("p_sq_scope", scopes, "First runs")
 which = st.segmented_control("Rows", scopes, key="p_sq_scope") or "First runs"
@@ -131,7 +135,7 @@ tbl = src.sort_values("Date", ascending=False)[["_mod_key", "Date", "CalendarWee
                                                 "RootCause"]].reset_index(drop=True)
 cfg = st.column_config
 ev = st.dataframe(ui.status_styler(tbl.drop(columns="_mod_key"), r.spec_limit), hide_index=True, width="stretch",
-                  height=360, on_select="rerun", selection_mode="single-row", key="sq_table",
+                  height=360, on_select="rerun", selection_mode="multi-row", key="sq_table",
                   column_config={**ui.run_table_config(),
                                  "Diag1": cfg.NumberColumn("Diag FL–RR", format="%.2f"),
                                  "Diag2": cfg.NumberColumn("Diag FR–RL", format="%.2f"),
@@ -144,7 +148,72 @@ ev = st.dataframe(ui.status_styler(tbl.drop(columns="_mod_key"), r.spec_limit), 
                                                                             "Both (see the chart above)"),
                                  "ShapeMax": cfg.NumberColumn("Shape uses (mm)", format="%.2f"),
                                  "RootCause": cfg.TextColumn("Root cause", width="large")})
-i = ui.selected_row(ev)
-if i is not None and i < len(tbl) and tbl.loc[i, "_mod_key"] != state.focus():
-    state.set_focus(tbl.loc[i, "_mod_key"])
+picked = [i for i in ui.selected_rows(ev) if i < len(tbl)]
+if len(picked) == 1 and tbl.loc[picked[0], "_mod_key"] != state.focus():
+    state.set_focus(tbl.loc[picked[0], "_mod_key"])
     st.rerun()
+
+# ---- Selected modules against the nominal --------------------------------------------------------
+MAX_CMP = 6
+ui.section("Selected modules against the nominal",
+           "Each selected module drawn over its nominal outline and diagonals, deviations magnified, with how much "
+           "longer (+) or shorter (−) each diagonal and edge is than nominal. The lengths depend only on the "
+           "module's shape, not on where it was placed.")
+if picked:
+    keys = tbl.loc[picked[:MAX_CMP], "_mod_key"].tolist()
+    if len(picked) > MAX_CMP:
+        st.caption(f":orange[Showing the first {MAX_CMP} of {len(picked)} selected modules.]")
+else:
+    keys = tbl.sort_values("DeltaDiag", ascending=False)["_mod_key"].head(3).tolist()
+    st.caption("Nothing selected: showing the 3 most deformed modules of the table. Select rows (up to "
+               f"{MAX_CMP}) to compare others.")
+cmp_df = src.set_index("_mod_key").loc[keys].reset_index()
+if cmp_df.empty:
+    st.info("No modules to compare.", icon=":material/info:")
+else:
+    names = [f"{p_} · R{int(r_)}" for p_, r_ in zip(cmp_df["PartID"], cmp_df["RunNum"])]
+    k1, k2, k3 = st.columns([1.6, 1.4, 2], vertical_alignment="bottom")
+    with k1:
+        views = ["Shape only", "As measured"]
+        state.ensure_option("p_sq_cmp_view", views, "Shape only")
+        view = st.segmented_control("Draw", views, key="p_sq_cmp_view",
+                                    help="Shape only: each module's best X / Y / yaw placement is removed, so the "
+                                         "drawing shows only what makes it differ from a rectangle. As measured: "
+                                         "the corners where they were measured.") or "Shape only"
+    parts = split_rigid_shape(cmp_df, c.nominals)
+    M = parts["S"] if view == "Shape only" else parts["D"]
+    nom_t = c.nominals.get(cmp_df["BatteryType"].iloc[0])
+    span = min(max(p_[0] for p_ in nom_t.values()) - min(p_[0] for p_ in nom_t.values()),
+               max(p_[1] for p_ in nom_t.values()) - min(p_[1] for p_ in nom_t.values()))
+    auto_m = svg.auto_magnify(float(np.nanmax(np.abs(M))) if np.isfinite(M).any() else 0.0, span, share=0.12)
+    with k2:
+        state.init("p_sq_cmp_mag", "Auto")
+        mag_opt = st.select_slider("Magnify ×", ["Auto", *svg.MAGNIFY_STEPS], key="p_sq_cmp_mag",
+                                   format_func=lambda o: f"Auto (×{auto_m})" if o == "Auto" else f"×{o}")
+    k_mag = auto_m if mag_opt == "Auto" else int(mag_opt)
+    with k3:
+        if len(names) > 1:
+            lab = st.selectbox("Values on the drawing for", names, index=0)
+            lab_i = names.index(lab)
+        else:
+            lab_i = 0
+    left, right = st.columns([1.35, 1], gap="large")
+    with left:
+        ui.chart(cs.compare_outlines(cmp_df, c.nominals, k_mag, aligned=view == "Shape only", labels_for=lab_i),
+                 "sq_cmp_draw")
+    with right:
+        dims = dimension_deviations(cmp_df, c.nominals)
+        ui.chart(cs.dimension_bars(dims, names, r.diag_tol), "sq_cmp_bars")
+    dtab = dims.copy()
+    dtab.insert(0, "Module", names)
+    dtab.insert(1, "Status", cmp_df["Status"].to_numpy())
+    dtab.insert(2, "Squareness", cmp_df["SquarenessStatus"].to_numpy())
+    st.dataframe(dtab, hide_index=True, width="stretch",
+                 column_config={"Module": cfg.TextColumn(width=270),
+                                **{d: cfg.NumberColumn(d, format="%+.2f") for d in
+                                   (*DIMENSIONS, "Diagonal difference")},
+                                **{f"Angle {k}": cfg.NumberColumn(f"Angle {k} °", format="%+.3f") for k in CORNERS}})
+    st.caption(f"Measured − nominal, mm (angles in °). The module is DEFORMED when the two diagonals differ by "
+               f"more than {r.diag_tol:g} mm (|Diagonal difference|). Front/Rear = the FL–FR and RL–RR edges, "
+               "Left/Right = FL–RL and FR–RR. A parallelogram shows opposite signs on the two diagonals and corner "
+               "angles; a trapezoid shows front ≠ rear or left ≠ right.")

@@ -276,15 +276,21 @@ def run_table_config() -> dict:
     return cfg
 
 
-def selected_row(event) -> int | None:
-    """Index of the selected row from an st.dataframe selection event."""
+def selected_rows(event) -> list[int]:
+    """Indices of the selected rows from an st.dataframe selection event."""
     try:
         rows = event.selection.rows
     except AttributeError:
         try:
             rows = event["selection"]["rows"]
         except (KeyError, TypeError):
-            return None
+            return []
+    return list(rows or [])
+
+
+def selected_row(event) -> int | None:
+    """Index of the (first) selected row from an st.dataframe selection event."""
+    rows = selected_rows(event)
     return rows[0] if rows else None
 
 

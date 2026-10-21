@@ -145,3 +145,20 @@ def test_why_each_nok_failed():
     assert list(mech["NokCause"]) == list(cases)
     ok = geometry.failure_mechanism(frame(t, np.zeros(8), "PASS"), 3.0, NOM)
     assert ok["NokCause"].iloc[0] == ""
+
+
+@pytest.mark.parametrize("t", TYPES)
+def test_dimension_deviations(t):
+    E, _ = geometry.mode_basis(t, NOM)
+    df = pd.concat([frame(t, rigid_deviations(t, 1.3, -0.7, 0.2)),            # a rigid move: nothing changes
+                    frame(t, 2.0 * E[:, 5]),                                   # a parallelogram
+                    frame(t, np.r_[np.nan, np.nan, np.zeros(6)])], ignore_index=True)
+    dims = geometry.dimension_deviations(df, NOM)
+    np.testing.assert_allclose(dims.iloc[0].to_numpy(float), 0.0, atol=2e-3)
+    par = dims.iloc[1]
+    assert np.sign(par["Diag FL–RR"]) == -np.sign(par["Diag FR–RL"]) and abs(par["Diag FL–RR"]) > 0.5
+    assert np.sign(par["Angle FL"]) == -np.sign(par["Angle FR"])
+    assert dims.iloc[2].isna().all()                                            # incomplete: no geometry
+    sq = geometry.squareness(df, 1.5, NOM)                                      # same numbers as the report
+    assert sq.loc[1, "DeltaDiag"] == pytest.approx(abs(par["Diagonal difference"]))
+    assert sq.loc[1, "AngleDevFL"] == pytest.approx(par["Angle FL"])

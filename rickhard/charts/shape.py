@@ -179,3 +179,113 @@ def diag_hist(sq: pd.DataFrame, diag_tol: float, title: str | None = None, heigh
                      range=[0, max(diag_tol * 2.0, p99 * 1.15)])
     fig.update_yaxes(title_text="Modules")
     return T.style(fig, height=height, title=title)
+
+
+# ---------------------------------------------------------------------------
+# Selected modules against the nominal outline
+# ---------------------------------------------------------------------------
+
+def compare_outlines(df: pd.DataFrame, nominals, magnify: float, aligned: bool = True, labels_for: int | None = 0,
+                     title: str | None = None, height: int = 560) -> go.Figure:
+    """The selected modules drawn over their nominal outline and diagonals,
+    deviations magnified. ``aligned``: each module's best rigid placement is
+    removed first, so only its shape is left (what the diagonals and edges
+    measure). The module at position ``labels_for`` carries the measured − nominal
+    length of every edge and diagonal (mm)."""
+    from ..constants import CORNERS
+    from ..geometry import DIMENSIONS, dimension_deviations, split_rigid_shape
+
+    P = T.pal()
+    fig = go.Figure()
+    if df.empty:
+        return T.empty("Select modules in the table.")
+    parts = split_rigid_shape(df, nominals)
+    M = parts["S"] if aligned else parts["D"]
+    dims = dimension_deviations(df, nominals)
+    order = [0, 1, 3, 2, 0]  # FL, FR, RR, RL around the outline
+    for t in sorted(df["BatteryType"].unique()):
+        nom = nominals.get(t)
+        nx = [nom[CORNERS[i]][0] for i in order]
+        ny = [nom[CORNERS[i]][1] for i in order]
+        fig.add_trace(go.Scatter(x=nx, y=ny, mode="lines", name=f"Nominal {t}", legendgroup="nominal",
+                                 line=dict(color=P.nominal, width=2, dash="dash"), hoverinfo="skip"))
+        for (i, j) in (DIMENSIONS["Diag FL–RR"], DIMENSIONS["Diag FR–RL"]):
+            fig.add_trace(go.Scatter(x=[nom[CORNERS[i]][0], nom[CORNERS[j]][0]],
+                                     y=[nom[CORNERS[i]][1], nom[CORNERS[j]][1]], mode="lines", showlegend=False,
+                                     line=dict(color=T.rgba(P.nominal, 0.45), width=1, dash="dot"), hoverinfo="skip"))
+    for k, (idx, row) in enumerate(df.iterrows()):
+        nom = nominals.get(row["BatteryType"])
+        color = P.series(k)
+        px = np.array([nom[c][0] for c in CORNERS]) + magnify * M[k, 0::2]
+        py = np.array([nom[c][1] for c in CORNERS]) + magnify * M[k, 1::2]
+        name = f"{row['PartID']} · R{int(row['RunNum'])}"
+        hover = (f"<b>{name}</b><br>" + "<br>".join(f"{d}: {dims.loc[idx, d]:+.2f} mm" for d in DIMENSIONS)
+                 + f"<br>Diagonal difference: {dims.loc[idx, 'Diagonal difference']:+.2f} mm")
+        fig.add_trace(go.Scatter(x=px[order], y=py[order], mode="lines+markers", name=name, legendgroup=name,
+                                 line=dict(color=color, width=2.5), marker=dict(size=7, color=color),
+                                 hovertext=[hover] * 5, hoverinfo="text"))
+        for (i, j) in (DIMENSIONS["Diag FL–RR"], DIMENSIONS["Diag FR–RL"]):
+            fig.add_trace(go.Scatter(x=[px[i], px[j]], y=[py[i], py[j]], mode="lines", legendgroup=name,
+                                     showlegend=False, line=dict(color=T.rgba(color, 0.7), width=1.2, dash="dashdot"),
+                                     hoverinfo="skip"))
+        if labels_for is not None and k == labels_for:
+            cx, cy = px.mean(), py.mean()
+            span = max(px.max() - px.min(), py.max() - py.min())
+            for d, (i, j) in DIMENSIONS.items():
+                if d.startswith("Diag"):   # along the diagonal, near its first corner, so the two never meet
+                    lx, ly = px[i] + 0.27 * (px[j] - px[i]), py[i] + 0.27 * (py[j] - py[i])
+                else:                       # just outside the middle of the edge
+                    mx_, my_ = (px[i] + px[j]) / 2, (py[i] + py[j]) / 2
+                    vx, vy = mx_ - cx, my_ - cy
+                    nv = float(np.hypot(vx, vy)) or 1.0
+                    lx, ly = mx_ + 0.06 * span * vx / nv, my_ + 0.06 * span * vy / nv
+                v = dims.loc[idx, d]
+                fig.add_annotation(x=lx, y=ly, text=f"<b>{d.split()[-1]}</b> {v:+.2f}", showarrow=False,
+                                   font=dict(size=11, color=color), bgcolor=T.rgba(P.ink["surface"], 0.85),
+                                   bordercolor=T.rgba(color, 0.6), borderwidth=1, borderpad=2)
+    # corner names at the nominal corners (once per position when two types share a corner)
+    seen = set()
+    for t in sorted(df["BatteryType"].unique()):
+        nom = nominals.get(t)
+        for c in CORNERS:
+            x0, y0 = nom[c]
+            if (round(x0), round(y0)) in seen:
+                continue
+            seen.add((round(x0), round(y0)))
+            fig.add_annotation(x=x0, y=y0, text=f"<b>{c}</b>", showarrow=False, font=dict(size=12, color=P.nominal),
+                               xshift=-16 if c in ("RL", "RR") else 16, yshift=12 if c in ("FL", "RL") else -12)
+    fig.update_xaxes(title_text="Global X (mm) — front →", showgrid=False)
+    fig.update_yaxes(title_text="Global Y (mm)", autorange="reversed", scaleanchor="x", scaleratio=1, showgrid=False)
+    what = "shape only (each module's best placement removed)" if aligned else "as measured (placement included)"
+    fig.add_annotation(x=1, y=0, xref="paper", yref="paper", xanchor="right", yanchor="bottom", showarrow=False,
+                       text=f"{what} · deviations ×{magnify:g} · labels: measured − nominal (mm)",
+                       font=dict(size=11, color=P.ink["muted"]))
+    T.style(fig, height=height, title=title, legend_bottom=True)
+    return fig
+
+
+def dimension_bars(dims: pd.DataFrame, names: list[str], diag_tol: float | None = None, title: str | None = None,
+                   height: int = 380) -> go.Figure:
+    """Measured − nominal length of each diagonal and edge, one bar per selected module."""
+    from ..geometry import DIMENSIONS
+
+    P = T.pal()
+    if dims.empty:
+        return T.empty("Select modules in the table.")
+    cats = [*DIMENSIONS, "Diagonal difference"]
+    labels = [c.replace(" ", "<br>", 1) for c in cats]
+    fig = go.Figure()
+    for k, (idx, name) in enumerate(zip(dims.index, names)):
+        vals = dims.loc[idx, cats].astype(float)
+        fig.add_trace(go.Bar(x=labels, y=vals, name=name, marker_color=P.series(k),
+                             hovertemplate="%{x}: %{y:+.2f} mm<extra>" + name + "</extra>"))
+    fig.add_hline(y=0, line=dict(color=P.ink["axis"], width=1))
+    if diag_tol:
+        for s in (-1, 1):
+            fig.add_shape(type="line", xref="x", yref="y", x0=len(cats) - 1.45, x1=len(cats) - 0.55,
+                          y0=s * diag_tol, y1=s * diag_tol, line=dict(color=P.limit, width=1.5, dash="dash"))
+        fig.add_annotation(x=len(cats) - 1, y=diag_tol, text=f"±{diag_tol:g} mm limit", showarrow=False,
+                           yshift=10, font=dict(size=10, color=P.ink["secondary"]))
+    fig.update_layout(barmode="group", bargap=0.25, bargroupgap=0.05)
+    fig.update_yaxes(title_text="Measured − nominal (mm)", zeroline=False)
+    return T.style(fig, height=height, title=title, legend_bottom=True)

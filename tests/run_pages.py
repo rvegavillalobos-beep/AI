@@ -57,6 +57,8 @@ def main() -> int:
     # interactions
     results.append(scenario("geometry: select a row → focus", "geometry", select={"geo_table": [0]}))
     results.append(scenario("passport with focus", "passport"))
+    results.append(scenario("shape: compare 3 selected modules", "shape", select={"sq_table": [0, 1, 2]}))
+    results.append(scenario("shape: one selected module → focus", "shape", select={"sq_table": [1]}))
     results.append(scenario("compensation: best yaw + use + log", "compensation",
                             click={"Best yaw for this X / Y", "Use in Path to Target", "Log as intervention"}))
     results.append(scenario("target with chosen correction", "target"))
