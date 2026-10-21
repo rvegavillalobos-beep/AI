@@ -187,10 +187,13 @@ else:
                max(p_[1] for p_ in nom_t.values()) - min(p_[1] for p_ in nom_t.values()))
     auto_m = svg.auto_magnify(float(np.nanmax(np.abs(M))) if np.isfinite(M).any() else 0.0, span, share=0.12)
     with k2:
-        state.init("p_sq_cmp_mag", "Auto")
-        mag_opt = st.select_slider("Magnify ×", ["Auto", *svg.MAGNIFY_STEPS], key="p_sq_cmp_mag",
-                                   format_func=lambda o: f"Auto (×{auto_m})" if o == "Auto" else f"×{o}")
-    k_mag = auto_m if mag_opt == "Auto" else int(mag_opt)
+        cur = st.session_state.get("p_sq_cmp_mag")
+        if not isinstance(cur, int) or not 1 <= cur <= 200:      # first visit (or an old setting): the auto factor
+            st.session_state["p_sq_cmp_mag"] = int(min(200, max(1, auto_m)))
+        k_mag = st.slider("Magnify × (1 = true scale)", 1, 200, step=1, key="p_sq_cmp_mag",
+                          help=f"1 draws the modules at their real size: deviations of a few mm are then hard to see "
+                               f"on a module over a metre long — zoom into a corner (drag a box on the chart) to "
+                               f"inspect it. Suggested for these modules: ×{auto_m}.")
     with k3:
         if len(names) > 1:
             lab = st.selectbox("Values on the drawing for", names, index=0)

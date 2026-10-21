@@ -258,7 +258,8 @@ def compare_outlines(df: pd.DataFrame, nominals, magnify: float, aligned: bool =
     fig.update_yaxes(title_text="Global Y (mm)", autorange="reversed", scaleanchor="x", scaleratio=1, showgrid=False)
     what = "shape only (each module's best placement removed)" if aligned else "as measured (placement included)"
     fig.add_annotation(x=1, y=0, xref="paper", yref="paper", xanchor="right", yanchor="bottom", showarrow=False,
-                       text=f"{what} · deviations ×{magnify:g} · labels: measured − nominal (mm)",
+                       text=f"{what} · " + ("true scale (1:1)" if magnify == 1 else f"deviations ×{magnify:g}")
+                            + " · labels: measured − nominal (mm)",
                        font=dict(size=11, color=P.ink["muted"]))
     T.style(fig, height=height, title=title, legend_bottom=True)
     return fig
