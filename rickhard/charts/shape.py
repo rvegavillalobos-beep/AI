@@ -321,7 +321,6 @@ def diagonal_trend(df: pd.DataFrame, dims: pd.DataFrame, diag_tol: float, window
         roll = pd.Series(y).rolling(window, min_periods=minp, center=True).mean()
         fig.add_trace(go.Scatter(x=seq, y=roll, mode="lines", name=f"{name} rolling mean ({window})",
                                  legendgroup=name, line=dict(color=color, width=2.5), hoverinfo="skip"), row=1, col=1)
-    fig.add_hline(y=0, line=dict(color=P.ink["axis"], width=1), row=1, col=1)
     diff = dims["Diagonal difference"].to_numpy(float)
     out = np.abs(diff) > diag_tol
     fig.add_trace(go.Scattergl(x=seq, y=diff, mode="markers", name="Difference (square)", legendgroup="diff",
@@ -340,6 +339,8 @@ def diagonal_trend(df: pd.DataFrame, dims: pd.DataFrame, diag_tol: float, window
                              legendgroup="diff", line=dict(color=P.c["violet"], width=2.5), hoverinfo="skip"),
                   row=2, col=1)
     T.limit_lines(fig, diag_tol, row=2, col=1)
+    for r_ in (1, 2):  # a clearly marked zero: nominal diagonal / equal diagonals
+        fig.add_hline(y=0, line=dict(color=T.rgba(P.ink["primary"], 0.75), width=2), row=r_, col=1)
     if events is not None and len(events):
         dates = pd.to_datetime(df["Date"]).to_numpy()
         xs, titles = [], []
@@ -353,5 +354,24 @@ def diagonal_trend(df: pd.DataFrame, dims: pd.DataFrame, diag_tol: float, window
     lim = max(diag_tol * 1.6, float(np.nanpercentile(np.abs(diff), 99)) * 1.1 if np.isfinite(diff).any() else 0)
     fig.update_yaxes(range=[-lim, lim], title_text="Difference (mm)", row=2, col=1)
     fig.update_yaxes(title_text="Diagonal − nominal (mm)", row=1, col=1)
-    fig.update_xaxes(title_text="Module # (chronological)", row=2, col=1)
+    # calendar weeks under the axis: a label in the middle of each week, a faint line where a week starts
+    cw = df["CalendarWeek"].astype(object).map(str).to_numpy()
+    starts = np.flatnonzero(np.r_[True, cw[1:] != cw[:-1]])
+    ends = np.r_[starts[1:], len(cw)]
+    for b in starts[1:]:
+        fig.add_shape(type="line", xref="x2", yref="paper", x0=b + 0.5, x1=b + 0.5, y0=0, y1=1, layer="below",
+                      line=dict(color=T.rgba(P.ink["muted"], 0.45), width=1, dash="dot"))
+    # a label only where there is room for it: weeks with few modules are narrow
+    min_gap = 0.055 * len(cw)
+    tickvals, ticktext, last = [], [], -np.inf
+    for a_, e_ in zip(starts, ends):
+        mid = (a_ + e_ + 1) / 2
+        if mid - last >= min_gap:
+            tickvals.append(mid)
+            ticktext.append(cw[a_])
+            last = mid
+    fig.update_xaxes(tickmode="array", tickvals=tickvals, ticktext=ticktext, tickangle=0, showgrid=False,
+                     zeroline=False, title_text="Modules in production order, by calendar week (module # on hover)",
+                     row=2, col=1)
+    fig.update_xaxes(showgrid=False, zeroline=False, row=1, col=1)
     return T.style(fig, height=height, title=title, legend_bottom=True)
