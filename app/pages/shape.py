@@ -107,6 +107,28 @@ with c4:
     ui.section("Diagonal delta distribution")
     ui.chart(cs.diag_hist(sq, r.diag_tol), "sq_hist")
 
+# ---- Diagonals module by module ---------------------------------------------------------------
+ui.section("Diagonals module by module",
+           "Every complete first run in production order: how much longer (+) or shorter (−) than nominal each "
+           "diagonal is, with a rolling mean to show trends, and below it the difference between the two diagonals "
+           f"— a module is DEFORMED when it is beyond ±{r.diag_tol:g} mm. Both diagonals moving together means the "
+           "module size changes; moving apart means it is skewing (parallelogram). Dashed vertical lines: logged "
+           "interventions.")
+dt1, dt2 = st.columns([1.4, 2], vertical_alignment="bottom")
+with dt1:
+    trend_types = ["All types", *c.types] if len(c.types) > 1 else list(c.types)
+    state.ensure_option("p_sq_tr_type", trend_types, trend_types[0])
+    tr_type = st.segmented_control("Battery type", trend_types, key="p_sq_tr_type") or trend_types[0]
+with dt2:
+    state.init("p_sq_tr_win", 15)
+    tr_win = st.slider("Rolling mean window (modules)", 5, 101, step=2, key="p_sq_tr_win")
+tr = sq if tr_type == "All types" else sq[sq["BatteryType"] == tr_type]
+tr = tr.sort_values("Date", kind="stable")
+ev_tr = c.events
+if len(ev_tr):
+    ev_tr = ev_tr[ev_tr["Scope"].isin(["All"] + ([tr_type] if tr_type != "All types" else list(c.types)))]
+ui.chart(cs.diagonal_trend(tr, dimension_deviations(tr, c.nominals), r.diag_tol, int(tr_win), ev_tr), "sq_diag_trend")
+
 with st.expander("How this is worked out", icon=":material/help:"):
     st.markdown(
         "- Each module's four corner deviations are split in two: **placement**, the X/Y shift and rotation that "

@@ -290,3 +290,68 @@ def dimension_bars(dims: pd.DataFrame, names: list[str], diag_tol: float | None 
     fig.update_layout(barmode="group", bargap=0.25, bargroupgap=0.05)
     fig.update_yaxes(title_text="Measured − nominal (mm)", zeroline=False)
     return T.style(fig, height=height, title=title, legend_bottom=True)
+
+
+def diagonal_trend(df: pd.DataFrame, dims: pd.DataFrame, diag_tol: float, window: int = 15,
+                   events: pd.DataFrame | None = None, title: str | None = None, height: int = 620) -> go.Figure:
+    """Both diagonals of every module, one point per module in production order
+    (measured − nominal, mm) with a rolling mean, and below them the
+    difference between the diagonals — the squareness criterion — against its
+    limit. ``df`` and ``dims`` share the index and are already in date order."""
+    from plotly.subplots import make_subplots
+
+    P = T.pal()
+    if df.empty:
+        return T.empty("No complete modules.")
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.12, row_heights=[0.55, 0.45],
+                        # no title on top: that is where the intervention labels go
+                        subplot_titles=("", "Difference between the diagonals (FL–RR − FR–RL) · squareness criterion"))
+    seq = np.arange(1, len(df) + 1)
+    cd = np.stack([df["PartID"].astype(object).map(str), pd.to_datetime(df["Date"]).dt.strftime("%Y-%m-%d %H:%M"),
+                   df["CalendarWeek"].astype(object).map(str), df["BatteryType"].astype(object).map(str),
+                   df["Status"].astype(object).map(lambda s: {"PASS": "OK", "FAIL": "NOK"}.get(s, s))], axis=1)
+    hover_tail = "<br>%{customdata[0]} · %{customdata[3]}<br>%{customdata[1]} · %{customdata[2]} · %{customdata[4]}"
+    minp = max(3, window // 3)
+    for name, color in (("Diag FL–RR", P.c["blue"]), ("Diag FR–RL", P.c["orange"])):
+        y = dims[name].to_numpy(float)
+        fig.add_trace(go.Scattergl(x=seq, y=y, mode="markers", name=name, legendgroup=name,
+                                   marker=dict(size=5, color=color, opacity=0.5), customdata=cd,
+                                   hovertemplate=f"<b>Module #%{{x}}</b> · {name} %{{y:+.2f}} mm"
+                                                 + hover_tail + "<extra></extra>"), row=1, col=1)
+        roll = pd.Series(y).rolling(window, min_periods=minp, center=True).mean()
+        fig.add_trace(go.Scatter(x=seq, y=roll, mode="lines", name=f"{name} rolling mean ({window})",
+                                 legendgroup=name, line=dict(color=color, width=2.5), hoverinfo="skip"), row=1, col=1)
+    fig.add_hline(y=0, line=dict(color=P.ink["axis"], width=1), row=1, col=1)
+    diff = dims["Diagonal difference"].to_numpy(float)
+    out = np.abs(diff) > diag_tol
+    fig.add_trace(go.Scattergl(x=seq, y=diff, mode="markers", name="Difference (square)", legendgroup="diff",
+                               marker=dict(size=5, color=P.ink["muted"], opacity=0.55),
+                               customdata=cd,
+                               hovertemplate="<b>Module #%{x}</b> · difference %{y:+.2f} mm" + hover_tail
+                                             + "<extra></extra>"), row=2, col=1)
+    if out.any():
+        fig.add_trace(go.Scattergl(x=seq[out], y=diff[out], mode="markers", name=f"Deformed (|difference| > {diag_tol:g})",
+                                   legendgroup="def", marker=dict(size=6, color=P.status("FAIL"), opacity=0.85),
+                                   customdata=cd[out],
+                                   hovertemplate="<b>Module #%{x}</b> · difference %{y:+.2f} mm · DEFORMED"
+                                                 + hover_tail + "<extra></extra>"), row=2, col=1)
+    roll = pd.Series(diff).rolling(window, min_periods=minp, center=True).mean()
+    fig.add_trace(go.Scatter(x=seq, y=roll, mode="lines", name=f"Difference rolling mean ({window})",
+                             legendgroup="diff", line=dict(color=P.c["violet"], width=2.5), hoverinfo="skip"),
+                  row=2, col=1)
+    T.limit_lines(fig, diag_tol, row=2, col=1)
+    if events is not None and len(events):
+        dates = pd.to_datetime(df["Date"]).to_numpy()
+        xs, titles = [], []
+        for d_, t_ in zip(pd.to_datetime(events["Date"]), events["Title"]):
+            k = int(np.searchsorted(dates, np.datetime64(d_)))
+            if 0 < k < len(df):
+                xs.append(k + 0.5)
+                titles.append(t_)
+        if xs:
+            T.event_marks(fig, xs, titles, rows=[1, 2])
+    lim = max(diag_tol * 1.6, float(np.nanpercentile(np.abs(diff), 99)) * 1.1 if np.isfinite(diff).any() else 0)
+    fig.update_yaxes(range=[-lim, lim], title_text="Difference (mm)", row=2, col=1)
+    fig.update_yaxes(title_text="Diagonal − nominal (mm)", row=1, col=1)
+    fig.update_xaxes(title_text="Module # (chronological)", row=2, col=1)
+    return T.style(fig, height=height, title=title, legend_bottom=True)

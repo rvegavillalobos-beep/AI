@@ -4,6 +4,7 @@ import re
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from rickhard.charts import geometry_view as gv
 from rickhard.charts import svg
@@ -44,3 +45,20 @@ def test_auto_magnify_keeps_large_corrections_on_the_page():
     nums = [float(v) for v in re.findall(r'points="([^"]+)"', drawing)[1].replace(",", " ").split()]
     xs, ys = nums[0::2], nums[1::2]
     assert min(xs) >= 0 and max(xs) <= 640 and min(ys) >= 0 and max(ys) <= 520   # fits its frame at ×300
+
+
+def test_diagonal_trend_is_one_point_per_module_in_order():
+    from rickhard.charts import shape as cs
+    from rickhard.geometry import dimension_deviations
+
+    df = _modules(30)
+    df["Date"] = pd.date_range("2026-10-01", periods=30, freq="h")
+    df["CalendarWeek"] = "CW40"
+    dims = dimension_deviations(df, NOM)
+    ev = pd.DataFrame({"Date": [pd.Timestamp("2026-10-01 10:30")], "Title": ["Guide realigned"]})
+    fig = cs.diagonal_trend(df, dims, 1.5, 7, ev)
+    pts = {t.name: t for t in fig.data if t.mode == "markers"}
+    assert list(pts["Diag FL–RR"].x) == list(range(1, 31))
+    assert list(pts["Diag FR–RL"].y) == pytest.approx(dims["Diag FR–RL"].to_numpy())
+    assert list(pts["Difference (square)"].y) == pytest.approx(dims["Diagonal difference"].to_numpy())
+    assert any(s.x0 == 11.5 for s in fig.layout.shapes if s.type == "line" and s.x0 == s.x1)  # after module 11
