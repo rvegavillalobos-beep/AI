@@ -162,3 +162,15 @@ def test_dimension_deviations(t):
     sq = geometry.squareness(df, 1.5, NOM)                                      # same numbers as the report
     assert sq.loc[1, "DeltaDiag"] == pytest.approx(abs(par["Diagonal difference"]))
     assert sq.loc[1, "AngleDevFL"] == pytest.approx(par["Angle FL"])
+
+
+def test_nominal_dimensions_match_the_deviations():
+    nd = geometry.nominal_dimensions(NOM, TYPES).set_index("BatteryType")
+    for t in TYPES:
+        nom = NOM.get(t)
+        assert nd.loc[t, "Diag FL–RR"] == pytest.approx(np.hypot(nom["RR"][0] - nom["FL"][0], nom["RR"][1] - nom["FL"][1]))
+        assert nd.loc[t, "Front FL–FR"] == pytest.approx(abs(nom["FR"][1] - nom["FL"][1]))
+        # a module stretched 1 mm along X reads +1 mm on both long edges and nothing on the front edge
+        df = frame(t, np.r_[0.5, 0, 0.5, 0, -0.5, 0, -0.5, 0])
+        dev = geometry.dimension_deviations(df, NOM).iloc[0]
+        assert dev["Left FL–RL"] == pytest.approx(1.0, abs=1e-3) and abs(dev["Front FL–FR"]) < 1e-6

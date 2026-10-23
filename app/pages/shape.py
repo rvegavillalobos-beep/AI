@@ -6,7 +6,7 @@ from rickhard import metrics
 from rickhard.charts import shape as cs
 from rickhard.charts import svg
 from rickhard.constants import CORNERS
-from rickhard.geometry import DIMENSIONS, dimension_deviations, split_rigid_shape
+from rickhard.geometry import DIMENSIONS, dimension_deviations, nominal_dimensions, split_rigid_shape
 from rickhard.stats import significance_label
 
 c = data.ctx()
@@ -141,6 +141,13 @@ with st.expander("How this is worked out", icon=":material/help:"):
         "chance.\n"
         "- Only modules with all four corners measured are included.")
 
+ui.section("Nominal lengths (reference)", "From the nominal corner coordinates in Data & Settings. The Δ columns "
+                                          "of the report below are measured − nominal: + longer, − shorter.")
+st.dataframe(nominal_dimensions(c.nominals, [t_ for t_ in c.types if (sq["BatteryType"] == t_).any()] or list(c.types)),
+             hide_index=True, width="stretch",
+             column_config={"BatteryType": st.column_config.TextColumn("Type"),
+                            **{d: st.column_config.NumberColumn(f"{d} (mm)", format="%.2f") for d in DIMENSIONS}})
+
 ui.section("Squareness report", "Original table plus why each NOK failed. Select rows to compare those modules "
                                 "with the nominal below (one selected row also becomes the focus in Geometry and "
                                 "Module Passport).")
@@ -151,17 +158,27 @@ src = sq if which == "First runs" else a.sq_runs
 only_def = st.toggle("Only deformed modules", key=state.init("p_sq_only", False))
 if only_def:
     src = src[src["SquarenessStatus"] == "DEFORMED"]
-tbl = src.sort_values("Date", ascending=False)[["_mod_key", "Date", "CalendarWeek", "PartID", "RunNum", "BatteryType",
-                                                "Status", "NokCause", "ShapeMax", "Diag1", "Diag2", "DeltaDiag",
-                                                "WidthDelta", "LengthDelta", "AngleDevFL", "SquarenessStatus",
-                                                "RootCause"]].reset_index(drop=True)
+src_sorted = src.sort_values("Date", ascending=False)
+tbl = src_sorted[["_mod_key", "Date", "CalendarWeek", "PartID", "RunNum", "BatteryType",
+                  "Status", "NokCause", "ShapeMax", "Diag1", "Diag2", "DeltaDiag",
+                  "WidthDelta", "LengthDelta", "AngleDevFL", "SquarenessStatus",
+                  "RootCause"]].reset_index(drop=True)
+# the diagonal columns show measured − nominal; the nominal lengths are shown as a reference just above
+dd = dimension_deviations(src_sorted, c.nominals).reset_index(drop=True)
+tbl["Diag1"], tbl["Diag2"] = dd["Diag FL–RR"].to_numpy(), dd["Diag FR–RL"].to_numpy()
 cfg = st.column_config
 ev = st.dataframe(ui.status_styler(tbl.drop(columns="_mod_key"), r.spec_limit), hide_index=True, width="stretch",
                   height=360, on_select="rerun", selection_mode="multi-row", key="sq_table",
                   column_config={**ui.run_table_config(),
-                                 "Diag1": cfg.NumberColumn("Diag FL–RR", format="%.2f"),
-                                 "Diag2": cfg.NumberColumn("Diag FR–RL", format="%.2f"),
-                                 "DeltaDiag": cfg.NumberColumn("Δ diag", format="%.2f"),
+                                 "Diag1": cfg.NumberColumn("Diag FL–RR Δ", format="%+.2f",
+                                                           help="Measured − nominal length of the FL–RR diagonal "
+                                                                "(mm). Nominal lengths: see the reference above."),
+                                 "Diag2": cfg.NumberColumn("Diag FR–RL Δ", format="%+.2f",
+                                                           help="Measured − nominal length of the FR–RL diagonal "
+                                                                "(mm). Nominal lengths: see the reference above."),
+                                 "DeltaDiag": cfg.NumberColumn("Δ diag", format="%.2f",
+                                                               help="|Diag FL–RR Δ − Diag FR–RL Δ|: above the "
+                                                                    "squareness limit the module is DEFORMED."),
                                  "WidthDelta": cfg.NumberColumn("Width Δ", format="%+.2f"),
                                  "LengthDelta": cfg.NumberColumn("Length Δ", format="%+.2f"),
                                  "AngleDevFL": cfg.NumberColumn("FL angle Δ °", format="%+.3f"),

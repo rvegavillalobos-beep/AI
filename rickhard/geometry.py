@@ -378,6 +378,19 @@ DIMENSIONS: dict[str, tuple[int, int]] = {
 }
 
 
+def nominal_dimensions(nominals: Nominals, types) -> pd.DataFrame:
+    """Nominal length (mm) of both diagonals and the four edges, one row per battery type."""
+    rows = []
+    for t in types:
+        nom = nominals.get(t)
+        row = {"BatteryType": t}
+        for name, (i, j) in DIMENSIONS.items():
+            (xa, ya), (xb, yb) = nom[CORNERS[i]], nom[CORNERS[j]]
+            row[name] = float(np.hypot(xb - xa, yb - ya))
+        rows.append(row)
+    return pd.DataFrame(rows, columns=["BatteryType", *DIMENSIONS])
+
+
 def dimension_deviations(df: pd.DataFrame, nominals: Nominals) -> pd.DataFrame:
     """Measured minus nominal length (mm) of both diagonals and the four edges
     of every complete run, plus the corner angles' deviations (°).
