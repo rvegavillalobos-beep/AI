@@ -78,7 +78,7 @@ def main() -> int:
 
     def narrow_weeks():
         st.session_state["sb_types"] = "All types"
-        labels = st.session_state["sb_weeks"]
+        labels = st.session_state["_sb_weeks_val"]
         st.session_state["sb_weeks"] = (labels[1], labels[1])
     results.append(scenario("all pages, one week", "command", before=narrow_weeks))
     for p in PAGES[1:]:

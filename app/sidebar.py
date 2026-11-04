@@ -84,11 +84,22 @@ def filters_and_rules(ds) -> tuple[Settings, Scope, str, int]:
         weeks = runs[["WeekKey", "CalendarWeek"]].dropna().drop_duplicates().sort_values("WeekKey")
         labels, keys = weeks["CalendarWeek"].tolist(), [int(k) for k in weeks["WeekKey"].tolist()]
         if len(labels) > 1:
-            cur = ss.get("sb_weeks")
-            if cur is not None and (not isinstance(cur, (tuple, list)) or any(w not in labels for w in cur)):
-                ss.pop("sb_weeks")
-            w0, w1 = st.select_slider("Calendar weeks", options=labels, key="sb_weeks",
-                                      **_v("sb_weeks", (labels[0], labels[-1])))
+            # The chosen range lives in a plain key and is ALWAYS passed as ``value``: passing it only on the
+            # first run (and not afterwards) changes the widget's identity, so Streamlit dropped the user's
+            # choice and the filter jumped back (or applied only some of the time).
+            cur = ss.get("sb_weeks", ss.get("_sb_weeks_val"))
+            if not (isinstance(cur, (tuple, list)) and len(cur) == 2 and all(w in labels for w in cur)):
+                cur = (labels[0], labels[-1])
+            cur = tuple(sorted(cur, key=labels.index))
+            ss["_sb_weeks_val"] = cur
+            ss.pop("sb_weeks", None)
+
+            def _keep_weeks():
+                ss["_sb_weeks_val"] = tuple(ss["sb_weeks_w"])
+
+            w0, w1 = st.select_slider("Calendar weeks", options=labels, value=cur, key="sb_weeks_w",
+                                      on_change=_keep_weeks)
+            ss["_sb_weeks_val"] = (w0, w1)
             wf, wt = keys[labels.index(w0)], keys[labels.index(w1)]
         else:
             w0 = w1 = labels[0] if labels else "–"

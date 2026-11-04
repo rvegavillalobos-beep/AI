@@ -1,3 +1,5 @@
+import hashlib
+
 import pandas as pd
 import streamlit as st
 
@@ -46,14 +48,25 @@ with tab1:
     n_missing = int((~complete).sum())
     base = base[complete].sort_values("Date").reset_index(drop=True)
     n_all = len(base)
-    rng = st.session_state.get("p_geo_range")
-    if (not isinstance(rng, (tuple, list)) or len(rng) != 2 or not (0 <= rng[0] <= rng[1] <= max(0, n_all - 1))
-            or st.session_state.get("_geo_n") != n_all):
-        st.session_state["p_geo_range"] = (max(0, n_all - 40), max(0, n_all - 1))
-        st.session_state["_geo_n"] = n_all
+    # The window slider gets a key tied to the module list it indexes (scope, type, sidebar filter) and always
+    # receives its value. It is NOT a persisted "p_" widget: those are re-written on every run, which made it
+    # snap back while dragging, and its bounds change with the sidebar filter, which left a stale range behind.
+    # A new module list starts on its last 40 modules; the chosen window is remembered per list.
+    sig = f"{scope}|{tsel}|{n_all}|{base['Date'].iloc[0] if n_all else ''}|{base['Date'].iloc[-1] if n_all else ''}"
+    range_key = "geo_range_" + hashlib.sha1(sig.encode()).hexdigest()[:12]
+    window = (max(0, n_all - 40), max(0, n_all - 1))
+    saved = st.session_state.get("_geo_window")
+    if (isinstance(saved, tuple) and len(saved) == 2 and saved[0] == range_key
+            and 0 <= saved[1][0] <= saved[1][1] <= max(0, n_all - 1)):
+        window = saved[1]
+
+    def _remember_window(k=range_key):
+        st.session_state["_geo_window"] = (k, tuple(int(v) for v in st.session_state[k]))
+
     if n_all > 1:
         i0, i1 = st.slider("Modules shown (chronological index — drag to go back in time)", 0, n_all - 1,
-                           key="p_geo_range")
+                           value=window, key=range_key, on_change=_remember_window)
+        st.session_state["_geo_window"] = (range_key, (int(i0), int(i1)))
     else:
         i0, i1 = 0, 0
     plot_df = base.iloc[int(i0): int(i1) + 1]

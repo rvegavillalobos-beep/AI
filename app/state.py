@@ -56,7 +56,8 @@ def clamp(key: str, lo, hi, fallback=None) -> str:
 def reset_page_widgets() -> None:
     """Forget page settings and data-dependent filters (new data loaded)."""
     for k in list(st.session_state.keys()):
-        if isinstance(k, str) and (k.startswith(PERSIST) or k in ("sb_types", "sb_weeks", "focus")):
+        if isinstance(k, str) and (k.startswith(PERSIST) or k in ("sb_types", "sb_weeks", "sb_weeks_w", "_sb_weeks_val",
+                                                                   "_geo_window", "focus")):
             del st.session_state[k]
 
 
