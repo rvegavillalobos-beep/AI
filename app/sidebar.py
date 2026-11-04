@@ -36,10 +36,10 @@ def uploader(key: str, label: str = "Measurement export(s) — Excel or CSV") ->
 
 
 def brand() -> None:
-    logo = svg.as_img(svg.logo_svg(34), "RICKHARD X", "width:34px;height:34px;flex:0 0 34px")
+    logo = svg.as_img(svg.logo_svg(34), "ST020 Corner Analytics", "width:34px;height:34px;flex:0 0 34px")
     st.sidebar.html(f"<div style='display:flex;gap:10px;align-items:center;margin:-.4rem 0 .2rem 0'>{logo}"
-                    f"<div><div style='font-weight:750;font-size:1.05rem;line-height:1.1'>RICKHARD X</div>"
-                    f"<div style='font-size:.74rem;opacity:.65'>ST020 corner intelligence · v{__version__}</div></div></div>")
+                    f"<div><div style='font-weight:750;font-size:1.05rem;line-height:1.1'>ST020 Corner Analytics</div>"
+                    f"<div style='font-size:.74rem;opacity:.65'>Module geometry · FPY · SPC · v{__version__}</div></div></div>")
 
 
 def file_card(ds) -> None:
@@ -119,7 +119,7 @@ def filters_and_rules(ds) -> tuple[Settings, Scope, str, int]:
                                  help="Off (original rule): only X and Y decide PASS/FAIL.")
                 z_lo, z_hi = float(zl[0]), float(zl[1])
             ma = st.slider("Moving average (weeks)", 2, 10, key="sb_ma", **_v("sb_ma", 3))
-        st.caption(f"RICKHARD X v{__version__} · analytics run in your browser session only")
+        st.caption(f"ST020 Corner Analytics v{__version__} · analytics run in your browser session only")
 
     rules = Rules(spec_limit=float(spec), fpy_target=float(target), diag_tol=float(diag),
                   incomplete_as_fail=bool(excl), near_miss=float(near), z_in_status=bool(z_on),

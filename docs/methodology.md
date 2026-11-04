@@ -1,4 +1,4 @@
-# How RICKHARD X computes its numbers
+# How ST020 Corner Analytics computes its numbers
 
 Everything below lives in the `rickhard` package (no Streamlit inside), and the formulas inherited from the
 original RICKHARDV app are checked against a verbatim copy of its code in `tests/test_parity.py`.

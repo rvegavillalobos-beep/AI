@@ -1,4 +1,4 @@
-"""RICKHARD X — ST020 corner intelligence.
+"""ST020 Corner Analytics.
 
 Pure-Python analytics for the first-measurement quality of battery modules:
 loading the corner-deviation export, pass/fail and FPY, geometry and shape,
@@ -8,5 +8,5 @@ number can be tested and reused outside the app.
 """
 
 __version__ = "1.0.0"
-APP_NAME = "RICKHARD X"
-APP_TAGLINE = "ST020 Corner Intelligence"
+APP_NAME = "ST020 Corner Analytics"
+APP_TAGLINE = "Module geometry · FPY · SPC"

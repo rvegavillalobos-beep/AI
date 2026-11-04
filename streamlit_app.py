@@ -1,11 +1,11 @@
-"""RICKHARD X — ST020 corner intelligence.
+"""ST020 Corner Analytics.
 
 Run with:  streamlit run streamlit_app.py
 """
 
 import streamlit as st
 
-st.set_page_config(page_title="RICKHARD X · ST020 corner intelligence", page_icon=":material/crop_free:",
+st.set_page_config(page_title="ST020 Corner Analytics", page_icon=":material/crop_free:",
                    layout="wide", initial_sidebar_state="auto")
 
 from app import data, sidebar, state, ui  # noqa: E402  (page config must come first)

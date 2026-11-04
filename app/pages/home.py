@@ -4,8 +4,8 @@ from app import sidebar
 
 st.html("""
 <div class='rx-hero'>
-  <h1>RICKHARD X</h1>
-  <p>ST020 corner intelligence. Load the <i>Corner Cell Deviations</i> export and get first-pass yield, why
+  <h1>ST020 Corner Analytics</h1>
+  <p>Load the <i>Corner Cell Deviations</i> export and get first-pass yield, why
   modules fail, where the error comes from, whether the process is in control, and the X / Y / yaw correction
   that would help — with the evidence behind every number.</p>
 </div>

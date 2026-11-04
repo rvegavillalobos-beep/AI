@@ -1,4 +1,4 @@
-# RICKHARD X · ST020 corner intelligence
+# ST020 Corner Analytics
 
 A Streamlit dashboard for the first-measurement quality of battery modules at station ST020. Load the
 *Corner Cell Deviations* export and it answers the questions the line actually asks:

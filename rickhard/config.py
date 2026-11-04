@@ -162,7 +162,7 @@ PROJECT_VERSION = 1
 
 def project_to_json(load: LoadOptions, settings: Settings, events: list[dict] | None = None) -> str:
     payload = {
-        "app": "RICKHARD X",
+        "app": "ST020 Corner Analytics",
         "project_version": PROJECT_VERSION,
         "load": asdict(load),
         "rules": asdict(settings.rules),
@@ -177,7 +177,7 @@ def project_to_json(load: LoadOptions, settings: Settings, events: list[dict] | 
 def project_from_json(text: str) -> tuple[LoadOptions, Settings, list[dict]]:
     p = json.loads(text)
     if not isinstance(p, dict) or "rules" not in p:
-        raise ValueError("This is not a RICKHARD X project file.")
+        raise ValueError("This is not a ST020 Corner Analytics project file.")
     ld = p.get("load", {})
     load = LoadOptions(
         source_tz=str(ld.get("source_tz", "Europe/Berlin")),

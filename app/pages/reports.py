@@ -38,7 +38,7 @@ with left:
                     comp_offsets=comp_offsets, comp_sims=comp_sims))
         got = st.session_state.get("_rep_xlsx")
         if got and got[0] == sig:
-            ui.download_bytes("Download Excel report", got[1], f"RICKHARD_X_report_{stamp}.xlsx",
+            ui.download_bytes("Download Excel report", got[1], f"ST020_Corner_Analytics_report_{stamp}.xlsx",
                               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="rep_xlsx_dl",
                               primary=True)
 with right:
@@ -56,7 +56,7 @@ with right:
                 st.session_state["_rep_html"] = (sig + f"|{offline}|{note}", html_doc.encode("utf-8"))
         got = st.session_state.get("_rep_html")
         if got and got[0] == sig + f"|{offline}|{note}":
-            ui.download_bytes("Download HTML report", got[1], f"RICKHARD_X_report_{stamp}.html", "text/html",
+            ui.download_bytes("Download HTML report", got[1], f"ST020_Corner_Analytics_report_{stamp}.html", "text/html",
                               key="rep_html_dl", primary=True)
 
 with st.container(border=True):
