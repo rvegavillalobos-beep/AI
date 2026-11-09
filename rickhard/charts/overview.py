@@ -58,10 +58,6 @@ def weekly_fpy(weekly: pd.DataFrame, target: float, ma_window: int, show_incompl
         ev = events[events["CalendarWeek"].isin(x)]
         if len(ev):
             T.event_marks(fig, ev["CalendarWeek"], ev["Title"], rows=[1, 2], max_chars=20)
-    if low.any():
-        fig.add_annotation(x=1, y=-0.02, xref="paper", yref="paper", xanchor="right", yanchor="top",
-                           text="* and hollow points: weeks with fewer than 5 modules", showarrow=False,
-                           font=dict(size=10, color=P.ink["muted"]))
     fig.update_xaxes(type="category", row=1, col=1)
     fig.update_xaxes(type="category", row=2, col=1)
     return T.style(fig, height=height, title=title, margin=dict(b=24))
