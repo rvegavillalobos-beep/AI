@@ -58,7 +58,8 @@ with right:
         ui.action_list(acts, limit=8)
     st.page_link("app/pages/target.py", label="Simulate the levers — Path to Target", icon=":material/flag:")
     st.page_link("app/pages/compensation.py", label="Validate a correction — Compensation Studio", icon=":material/tune:")
-    st.page_link("app/pages/reports.py", label="Report for management — Reports", icon=":material/summarize:")
+    st.page_link("app/pages/events.py", label="Did the changes work? — Fix Loop", icon=":material/autorenew:")
+    st.page_link("app/pages/brief.py", label="One page for management — Executive Brief", icon=":material/article:")
 
 # ---- Weekly FPY ------------------------------------------------------------------------------
 ui.section("Weekly first-pass yield", "Line: FPY of the first measurement per week, band: 95% confidence interval, "

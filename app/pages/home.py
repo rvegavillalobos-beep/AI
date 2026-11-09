@@ -25,7 +25,7 @@ with left:
 with right:
     st.markdown("##### Privacy")
     st.caption("Files stay in this browser session: nothing is stored on a server or sent anywhere. Download a "
-               "project file in *Data & Settings* to keep your rules and intervention log.")
+               "project file in *Data & Settings* to keep your rules and action log.")
 
 st.html("""
 <div class='rx-feat'>
@@ -37,7 +37,10 @@ st.html("""
   printable work instruction for the line.</div>
   <div><b>Path to Target</b>What-if levers on your own modules: how much scatter you must remove to reach the target.</div>
   <div><b>SPC Monitor</b>I-MR and weekly charts with run rules, and dated process shifts found automatically.</div>
-  <div><b>Interventions</b>Log what was changed on the line and get a before / after verdict with statistics.</div>
+  <div><b>Fix Loop</b>Every change to the line starts a new set-up: log what is done and see whether it worked,
+  what still costs FPY and what it takes to reach the target.</div>
+  <div><b>Executive Brief</b>The whole story on one page for management — one file that opens anywhere and prints
+  like slides.</div>
   <div><b>Time Patterns</b>Shift, weekday × hour and start-up after line stops.</div>
   <div><b>Corner Lab · Geometry · Shape</b>Targets per corner, capability (Cp/Cpk/Pp/Ppk), module outlines, the
   drift movie, squareness and its link to NOK — everything the original app had, deeper.</div>

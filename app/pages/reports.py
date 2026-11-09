@@ -8,7 +8,8 @@ from rickhard import report, report_html
 c = data.ctx()
 a, r = c.a, c.rules
 ui.page_header(c, "reports", "One click to the files you send: a formatted Excel workbook for the team and a "
-                             "management report that opens in any browser.")
+                             "detailed report that opens in any browser. The one-page story for management is the "
+                             "Executive Brief.")
 ui.require(a.first)
 
 bundle = data.insight_bundle(c.key, a, c.ds)
@@ -29,13 +30,14 @@ with left:
         st.markdown("##### Excel workbook")
         st.caption("Summary with key figures, findings and the action plan; weekly FPY; first runs and all runs with "
                    "out-of-tolerance cells in red; capability; failure mechanisms; squareness; vector drift; error "
-                   "budget; process shifts; SPC alarms; interventions; data health.")
+                   "budget; process shifts; SPC alarms; the action log, set-ups and fix-loop verdicts; data "
+                   "health.")
         title = st.text_input("Report title", key=state.init("p_rep_title", "ST020 corner deviation report"))
         if st.button("Prepare Excel", icon=":material/table_view:", key="rep_xlsx_go", width="stretch"):
             with st.spinner("Writing the workbook…"):
                 st.session_state["_rep_xlsx"] = (sig, report.build_excel(
-                    a, bundle["insights"], bundle["actions"], extras, c.ds.health, c.events, comp_rows, title=title,
-                    comp_offsets=comp_offsets, comp_sims=comp_sims))
+                    a, bundle["insights"], bundle["actions"], extras, c.ds.health, data.actions_frame(), comp_rows,
+                    title=title, comp_offsets=comp_offsets, comp_sims=comp_sims, loop=data.fix_loop(c)))
         got = st.session_state.get("_rep_xlsx")
         if got and got[0] == sig:
             ui.download_bytes("Download Excel report", got[1], f"ST020_Corner_Analytics_report_{stamp}.xlsx",
@@ -43,7 +45,7 @@ with left:
                               primary=True)
 with right:
     with st.container(border=True):
-        st.markdown("##### Management report (HTML)")
+        st.markdown("##### Detailed report (HTML)")
         st.caption("KPIs, what the data says, the ranked action plan and the key interactive charts on one page. "
                    "Print it to PDF from the browser if you need a PDF.")
         note = st.text_input("Note on the cover line (optional)", key=state.init("p_rep_note", ""))
@@ -72,6 +74,7 @@ with st.container(border=True):
         ui.download_bytes("Weekly FPY (CSV)", a.weekly.to_csv(index=False).encode("utf-8"), f"weekly_fpy_{stamp}.csv",
                           "text/csv", key="dl_weekly")
 
+st.page_link("app/pages/brief.py", label="The one-page story for management — Executive Brief", icon=":material/article:")
 if not chosen:
     st.caption("Tip: pick a correction in **Compensation Studio** and press *Use in Path to Target* — it is then "
                "included in both reports.")

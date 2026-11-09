@@ -19,15 +19,15 @@ PAGE_ICONS = {
     "shape": ":material/square_foot:", "drift": ":material/moving:", "anatomy": ":material/biotech:",
     "spc": ":material/monitor_heart:", "patterns": ":material/schedule:",
     "height": ":material/height:", "target": ":material/flag:", "compensation": ":material/tune:",
-    "events": ":material/event_note:", "passport": ":material/badge:", "data": ":material/dataset:",
-    "reports": ":material/summarize:",
+    "events": ":material/autorenew:", "passport": ":material/badge:", "data": ":material/dataset:",
+    "reports": ":material/summarize:", "brief": ":material/article:",
 }
 PAGE_TITLES = {
     "command": "Command Center", "corners": "Corner Lab", "geometry": "Geometry", "shape": "Shape & Squareness",
     "drift": "Drift & Yaw", "anatomy": "Error Anatomy", "spc": "SPC Monitor", "patterns": "Time Patterns",
     "height": "Height (Z)", "target": "Path to Target",
-    "compensation": "Compensation Studio", "events": "Interventions", "passport": "Module Passport",
-    "data": "Data & Settings", "reports": "Reports",
+    "compensation": "Compensation Studio", "events": "Fix Loop", "passport": "Module Passport",
+    "data": "Data & Settings", "reports": "Reports", "brief": "Executive Brief",
 }
 LEVEL_COLOR = {"good": T.STATUS["good"], "warn": T.STATUS["warning"], "bad": T.STATUS["critical"],
                "info": "#2a78d6", "neutral": "#898781"}

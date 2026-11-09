@@ -114,7 +114,7 @@ def filters_and_rules(ds) -> tuple[Settings, Scope, str, int]:
                          help="A module passes when every corner's X and Y deviation is within ± this value.")
         if file_lim and abs(file_lim[1] - spec) > 1e-9:
             st.caption(f":orange[The export's own limit is ±{file_lim[1]:g} mm.]")
-        target = st.slider("FPY target (%)", 50.0, 100.0, step=0.5, key="sb_target", **_v("sb_target", 90.0))
+        target = st.slider("FPY target (%)", 50.0, 100.0, step=0.5, key="sb_target", **_v("sb_target", 99.0))
         excl = st.toggle("Count incomplete first runs as NOK", key="sb_excl", **_v("sb_excl", True),
                          help="On (original rule): a first measurement with a missing corner is a FAIL. "
                               "Off: it is kept apart as INCOMPLETE (it still lowers FPY).")

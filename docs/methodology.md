@@ -116,8 +116,53 @@ so no distribution is assumed. *Required reduction* finds by bisection the small
 target. The Command Center ranks actions by the FPY they are estimated to be worth this way; findings carry the test
 and p-value behind them.
 
-## 11. Interventions
+## 11. Fix loop
 
-For a logged change: the 14 days before against the 14 days after (scope: the battery types it affects). FPY with
-Fisher's exact test, placement and corner means with Welch's test, spread with Brown–Forsythe. The verdict says
-whether FPY changed significantly, or whether the process moved without a significant FPY change yet.
+The line is changed week after week, so a calendar window usually mixes two different lines. The fix loop works on
+**set-ups** instead: the production between two logged changes (actions with status *Done* whose scope touches the
+battery types in view). Actions made at the same moment are one boundary; a change logged before the first module
+only names the first set-up; a change logged after the last module opens an empty current set-up. *Planned* actions
+change nothing until they are set to *Done*.
+
+**FPY by set-up** carries a Wilson 95 % interval. The figures of the page and of the brief describe the newest set-up
+with at least 30 modules (or the one you pick).
+
+**A verdict per action.** The action is judged in its own scope on up to 300 first runs right before it and up to 300
+right after it, never across another logged change:
+
+| Verdict | Rule |
+|---|---|
+| Worked / Backfired | FPY after vs before differs with p < 0.05 (Fisher's exact test), up / down. |
+| Target hit | FPY not significant, but the thing the action aimed at improved with p < 0.05 and did not get worse on its other check. |
+| No effect | 150 or more modules after the change (or another change closed the set-up), and neither moved significantly. |
+| Verifying | Fewer than 30 modules since the change, or no significant difference yet with fewer than 150. |
+| Superseded | Another change followed before 30 modules were measured: the two effects cannot be separated. |
+| No baseline | Fewer than 10 modules before the change. |
+
+What "the thing it aimed at" means depends on the action's *Aims at*: for Shift X, Shift Y and Yaw the mean
+least-squares placement must move towards zero by at least 0.10 mm / 0.010° (Welch's t-test); for Scatter the spread
+of the placement must shrink by 15 % or more on one axis without growing on another (Brown–Forsythe); for Shape the
+mean shape residual must fall (Welch); and for every target the share of modules that fail *by that mechanism* is
+compared before and after (Fisher). If you logged a correction (dX, dY, dYaw), the measured change of the placement
+is shown next to the planned one.
+
+**Process shifts nobody logged** are the detected change points (section 6) with no *Done* action within two days.
+
+**Loss budget.** Every NOK first run of the set-up has one failure mechanism (section 3); the loss of a mechanism is
+its modules as a share of all modules of the set-up, in FPY points. A target of 99 % allows 1 point in total.
+
+**Path to the target.** Levers are applied one after the other to the set-up's own modules, cheapest first, and every
+module is judged again: centre the placement (minus the mean least-squares placement per type), halve the placement
+scatter, remove the shape error, and count only complete measurements. The bar starts at the measured FPY; the gains
+are the simulated differences, so their split depends on the order but their sum does not.
+
+**What the data can claim.** With *k* OK out of *n* modules the exact one-sided 95 % bounds (Clopper–Pearson) say
+what the FPY of the set-up is at least and at most; the target is *demonstrated* when the lower bound reaches it and
+*missed* when the upper bound stays under it. Demonstrating a target *p* with no NOK takes ln(0.05) / ln(*p*) modules
+in a row — 299 for 99 %, 59 for 95 % — on an unchanged line; the page shows the current run and the best one.
+
+## 12. Executive brief
+
+One self-contained HTML page built from the fix loop: headline and key figures, FPY by set-up, the verdict of every
+change, the loss budget, the path to the target, planned and suggested next steps, and the requests you type in. The
+charts are static SVG, so the file needs no chart library, opens offline and prints (A4 landscape) as it looks.

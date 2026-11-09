@@ -1,7 +1,10 @@
-"""Interventions log and before/after impact analysis.
+"""Action log and before/after impact analysis.
 
 Log what was done to the line (an end-stop moved, a guide realigned, a new
 tool) and the app tells you, with statistics, whether it changed anything.
+An action is either *Done* (it changed the line at its date) or *Planned*
+(a next step with an owner); ``Target`` says what it is meant to fix, so the
+fix loop can check that very thing (see ``rickhard.fixloop``).
 """
 
 from __future__ import annotations
@@ -12,9 +15,12 @@ import pandas as pd
 from .constants import DEV_COLS
 from .stats import fisher_2x2, levene, welch, wilson
 
-EVENT_COLUMNS = ["Date", "Scope", "Category", "Title", "Notes", "dX", "dY", "dYaw"]
+EVENT_COLUMNS = ["Date", "Scope", "Category", "Title", "Notes", "dX", "dY", "dYaw", "Status", "Target", "Owner"]
 CATEGORIES = ["Adjustment", "Maintenance", "Tooling", "Material", "Training", "Software", "Other"]
 SCOPES = ["All", "Type S", "Type M"]
+STATUSES = ["Done", "Planned"]
+TARGET_GENERAL = "FPY (general)"
+TARGETS = [TARGET_GENERAL, "Shift X", "Shift Y", "Yaw", "Scatter", "Shape", "Height (Z)", "Missing corner"]
 
 
 def normalize_events(records) -> pd.DataFrame:
@@ -30,7 +36,9 @@ def normalize_events(records) -> pd.DataFrame:
     df = df[df["Date"].notna()].copy()
     df["Scope"] = df["Scope"].where(df["Scope"].isin(SCOPES), "All")
     df["Category"] = df["Category"].where(df["Category"].isin(CATEGORIES), "Other")
-    for c in ("Title", "Notes"):
+    df["Status"] = df["Status"].where(df["Status"].isin(STATUSES), "Done")
+    df["Target"] = df["Target"].where(df["Target"].isin(TARGETS), TARGET_GENERAL)
+    for c in ("Title", "Notes", "Owner"):
         df[c] = df[c].fillna("").astype(object).map(str)
     df.loc[df["Title"].str.strip() == "", "Title"] = "Untitled event"
     for c in ("dX", "dY", "dYaw"):
@@ -49,6 +57,16 @@ def events_to_records(df) -> list[dict]:
     return out
 
 
+def done(events: pd.DataFrame) -> pd.DataFrame:
+    """Actions that were carried out: the ones that changed the line."""
+    return events[events["Status"] != "Planned"].reset_index(drop=True)
+
+
+def planned(events: pd.DataFrame) -> pd.DataFrame:
+    """Next steps that are not done yet."""
+    return events[events["Status"] == "Planned"].reset_index(drop=True)
+
+
 def scope_types(scope: str) -> tuple[str, ...]:
     return ("Type S", "Type M") if scope == "All" else (scope,)
 
@@ -64,9 +82,16 @@ def before_after(first: pd.DataFrame, when, scope: str = "All", window_days: flo
     dates = pd.to_datetime(d["Date"])
     before = d[(dates < when) & (dates >= when - pd.Timedelta(days=window_days))]
     after = d[(dates >= when) & (dates < when + pd.Timedelta(days=window_days))]
-    out: dict = {"n_before": len(before), "n_after": len(after), "when": when, "window_days": window_days,
-                 "before": before, "after": after}
-    if len(before) < 5 or len(after) < 5:
+    out = compare(before, after)
+    out.update({"when": when, "window_days": window_days})
+    return out
+
+
+def compare(before: pd.DataFrame, after: pd.DataFrame, min_n: int = 5) -> dict:
+    """FPY, placement, shape and every corner in two groups of first runs,
+    with the tests that say whether the difference is real."""
+    out: dict = {"n_before": len(before), "n_after": len(after), "before": before, "after": after}
+    if len(before) < min_n or len(after) < min_n:
         out["enough"] = False
         return out
     out["enough"] = True
@@ -77,7 +102,7 @@ def before_after(first: pd.DataFrame, when, scope: str = "All", window_days: flo
     rows = []
     variables = BA_VARIABLES + [(c, c.replace("_", " ") + " (mm)") for c in DEV_COLS]
     for col, label in variables:
-        if col not in d:
+        if col not in before or col not in after:
             continue
         a, b = before[col].to_numpy(float), after[col].to_numpy(float)
         diff, p = welch(a, b)

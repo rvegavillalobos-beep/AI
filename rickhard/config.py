@@ -44,7 +44,7 @@ class LoadOptions:
 @dataclass(frozen=True)
 class Rules:
     spec_limit: float = 3.0       # ± mm, X and Y, every corner
-    fpy_target: float = 90.0      # %
+    fpy_target: float = 99.0      # %
     diag_tol: float = 1.5         # mm, squareness (diagonal delta)
     incomplete_as_fail: bool = True
     near_miss: float = 0.5        # mm: a PASS with less margin than this is a near miss

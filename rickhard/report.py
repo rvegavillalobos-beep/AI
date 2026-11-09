@@ -76,7 +76,9 @@ def _write_table(ws, df: pd.DataFrame, start_row: int = 1, limit: float | None =
             first = f"{col}{start_row + 1}"
             for word, fill in (("PASS", GOOD_FILL), ("FAIL", BAD_FILL), ("INCOMPLETE", GREY_FILL), ("DEFORMED", BAD_FILL),
                                ("SQUARE OK", GOOD_FILL), ("Signal", BAD_FILL), ("Watch", WARN_FILL),
-                               ("In control", GOOD_FILL), ("Not acceptable", BAD_FILL), ("Good", GOOD_FILL)):
+                               ("In control", GOOD_FILL), ("Not acceptable", BAD_FILL), ("Good", GOOD_FILL),
+                               ("Worked", GOOD_FILL), ("Target hit", GOOD_FILL), ("Backfired", BAD_FILL),
+                               ("Verifying", WARN_FILL)):
                 ws.conditional_formatting.add(rng, FormulaRule(formula=[f'EXACT({first},"{word}")'], fill=fill))
     return last
 
@@ -109,8 +111,8 @@ def first_run_quality_summary(first: pd.DataFrame, incomplete_as_fail: bool) -> 
 def build_excel(a, insights=None, actions=None, extras: dict | None = None, health: dict | None = None,
                 events: pd.DataFrame | None = None, comp_rows: pd.DataFrame | None = None,
                 title: str = "ST020 corner deviation report", comp_offsets: pd.DataFrame | None = None,
-                comp_sims: pd.DataFrame | None = None) -> bytes:
-    """``a`` is a rickhard.analysis.Analysis.
+                comp_sims: pd.DataFrame | None = None, loop: dict | None = None) -> bytes:
+    """``a`` is a rickhard.analysis.Analysis; ``loop`` the result of ``fixloop.run`` (optional).
 
     The sheets of the original app's export come first, under the same names
     (Module_Summary_Report, First_Run_Quality_Summary, Weekly_FPY_Trend, …), so
@@ -230,6 +232,19 @@ def build_excel(a, insights=None, actions=None, extras: dict | None = None, heal
         _sheet(wb, "SPC alarms", ex["alarms"], number_format="0.000")
     if events is not None and len(events):
         _sheet(wb, "Interventions", events.drop(columns=["WeekKey"], errors="ignore"))
+    if loop is not None:
+        su = loop["setups"].drop(columns=["Label", "EventNo"], errors="ignore")
+        if len(su):
+            su = su.assign(Current=["yes" if x else "" for x in su["Current"]])
+        _sheet(wb, "Set-ups", su, number_format="0.0",
+               note="A set-up is the production between two logged changes. FPY with its Wilson 95% interval.")
+        _sheet(wb, "Fix loop", loop["ledger"].drop(columns=["Level"], errors="ignore"), number_format="0.000",
+               note="Every logged action judged on the modules right before and right after it, never across "
+                    "another logged change.")
+        _sheet(wb, "Loss budget", loop["budget"], number_format="0.00",
+               note="FPY points lost per failure mechanism in the judged set-up.")
+        _sheet(wb, "Path to target", loop["bridge"].drop(columns=["Key"], errors="ignore"), number_format="0.00",
+               note="Levers simulated on the judged set-up's own modules, cheapest first.")
     if health:
         hrows = [(k_, str(v)) for k_, v in health.items() if not isinstance(v, (list, dict)) or k_ in
                  ("limits_in_file", "types", "time_formats", "similar_part_ids")]

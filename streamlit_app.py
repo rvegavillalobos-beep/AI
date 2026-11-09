@@ -57,10 +57,10 @@ if context is None:
                         position="hidden")
 else:
     sections = {
-        "Overview": [page("command", default=True)],
+        "Overview": [page("command", default=True), page("events"), page("brief")],
         "Analyze": [page("corners"), page("geometry"), page("shape"), page("drift"), page("anatomy")],
         "Monitor": [page("spc"), page("patterns")] + ([page("height")] if context.ds.has_z else []),
-        "Improve": [page("target"), page("compensation"), page("events")],
+        "Improve": [page("target"), page("compensation")],
         "Tools": [page("passport"), page("data"), page("reports")],
     }
     nav = st.navigation(sections, position="top")

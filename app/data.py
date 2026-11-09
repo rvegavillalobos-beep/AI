@@ -8,6 +8,7 @@ code version decides what is reused.
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,7 +16,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from rickhard import analysis, compensation, demo, geometry, improvement, insights, loading, spc
+from rickhard import analysis, compensation, demo, fixloop, geometry, improvement, insights, loading, spc
 from rickhard import events as ev_mod
 from rickhard.analysis import Analysis
 from rickhard.config import LoadOptions, Scope, Settings
@@ -117,8 +118,15 @@ def ctx() -> Context:
     return c
 
 
+def actions_frame() -> pd.DataFrame:
+    """The whole action log: what was done and what is planned."""
+    return ev_mod.normalize_events(state.events())
+
+
 def events_frame() -> pd.DataFrame:
-    df = ev_mod.normalize_events(state.events())
+    """The changes that were made to the line (planned actions left out), with
+    their calendar week — what the charts mark on the time axis."""
+    df = ev_mod.done(actions_frame())
     if len(df):
         loading.add_week_columns(df, "Date")
     else:
@@ -143,6 +151,23 @@ def alarms(key: str, recent_days: int, _a: Analysis) -> pd.DataFrame:
     vars_ = dict(PLACEMENT_VARS)
     vars_["WorstAbs"] = "Worst corner |dev|"
     return spc.alarm_board(_a.first, vars_, recent_days=recent_days)
+
+
+def events_signature() -> str:
+    return json.dumps(state.events(), sort_keys=True, default=str)
+
+
+@st.cache_data(max_entries=24, show_spinner=False)
+def _fix_loop(key: str, events_sig: str, window: int, setup_no: int | None, _a: Analysis, _events: list) -> dict:
+    r = _a.settings.rules
+    return fixloop.run(_a.first, _events, r.fpy_target, r.spec_limit, _a.settings.nominals, window=window,
+                       setup_no=setup_no)
+
+
+def fix_loop(c: Context, window: int = fixloop.WINDOW, setup_no: int | None = None) -> dict:
+    """Set-ups, verdicts, loss budget, bridge and proof for the current
+    filters and action log (see ``rickhard.fixloop.run``)."""
+    return _fix_loop(c.key, events_signature(), int(window), setup_no, c.a, state.events())
 
 
 @st.cache_data(max_entries=24, show_spinner="Reading the data for findings…")

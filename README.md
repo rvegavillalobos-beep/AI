@@ -14,6 +14,12 @@ A Streamlit dashboard for the first-measurement quality of battery modules at st
 - **What should we adjust, and is it safe?** X / Y / yaw compensation (the original median method, a rigid fit and a
   robust optimum), with the uncertainty of the gain, a readiness check and a work instruction for the line.
 - **What would it take to reach the target?** What-if levers simulated on your own modules.
+- **Did the change work?** The line is adjusted all the time, so the **Fix Loop** works on *set-ups* — the production
+  between two logged changes — instead of calendar windows: FPY per set-up, a verdict for every action (worked,
+  target hit, no effect, backfired, still verifying, superseded), where the missing points of the current set-up go
+  and what it takes to close the gap to the target (99 % by default).
+- **How do I tell management?** The **Executive Brief**: the whole story on one page, in one file that opens
+  anywhere, also offline, and prints like slides.
 
 It builds on [RICKHARDV](https://github.com/rvegavillalobos-beep/RICKHARDV) and on its rebuild *Corner QC*
 ([New](https://github.com/rvegavillalobos-beep/New)): everything both computed is still here — corner targets, trend
@@ -46,6 +52,9 @@ square?), median-based and optimised compensation — with the same formulas and
       focus on it.</td>
   </tr>
 </table>
+
+![Executive Brief: the yield of every set-up, what was done and whether it worked, what still costs yield, what it
+takes to reach the target and the next steps](docs/img/executive-brief.png)
 
 <details>
 <summary>Dark theme</summary>
@@ -86,14 +95,16 @@ The app reads the station export as it comes (`.xlsx`, `.xlsm`, `.xls`, `.csv`, 
 
 *Data & Settings* shows exactly what was read: a data-quality report, how times, runs and corners were interpreted,
 the nominal geometry, the shift plan, and manual overrides if the automatic detection guesses wrong. Files stay in the
-browser session; nothing is stored on a server. Rules, reading options and the intervention log can be saved as a
-small project file and loaded again later.
+browser session; nothing is stored on a server. Rules, reading options and the action log can be saved as a
+small project file and loaded again later — do that after logging a change, the log lives in the session only.
 
 ## Pages
 
 | Section | Page | What it answers |
 |---|---|---|
 | Overview | **Command Center** | FPY vs target, what the data says in plain language, a ranked action plan with the FPY each action is worth, why and where modules fail. |
+| | **Fix Loop** | The action log (what was done, what is planned, what each action aims at and who owns it), FPY by set-up, a verdict for every action judged on the modules right before and right after it, process shifts nobody logged, where the missing FPY points go, what it takes to reach the target, and how many modules it takes to demonstrate it. |
+| | **Executive Brief** | The same story on one page for management: headline, key figures, FPY by set-up, what was done and whether it worked, what still costs yield, the path to the target, next steps and what you need. Downloads as one self-contained HTML file. |
 | Analyze | **Corner Lab** | Corner targets, capability per corner and axis (Cp, Cpk, Pp, Ppk with confidence intervals and ppm), offset vs scatter, the original trend matrix. |
 | | **Geometry** | Modules drawn against the nominal outline with magnified deviations (scroll back in time; each module is a legend entry to hide or isolate), a focused module's corner values and geometry, the week-by-week drift movie, the correction map. |
 | | **Shape & Squareness** | Is deformation behind the NOK? Why each NOK failed (placement / shape + placement / shape), the tolerance the shape uses up, NOK rate by amount of deformation, the original squareness report and root-cause rules. |
@@ -104,10 +115,9 @@ small project file and loaded again later.
 | | **Height (Z)** | Level, pitch, roll and twist of every module (shown when the export contains Z). |
 | Improve | **Path to Target** | What-if levers: how much offset and scatter must go to reach the FPY target, with a sensitivity chart. |
 | | **Compensation Studio** | Median, rigid-fit, robust and your own X / Y / yaw compared in-window, with a safety margin and the bootstrap interval of the gain, FPY maps over X / Y and yaw, readiness checklist, work instruction, piece-level simulation. |
-| | **Interventions** | Log what was done to the line and get a before / after verdict with statistics. |
 | Tools | **Module Passport** | Everything about one module: runs, geometry, why it failed, what was produced around it. |
 | | **Data & Settings** | Data-quality report, reading options, nominal geometry, shift plan, project file. |
-| | **Reports** | A formatted Excel workbook for the team and a management report (HTML) that opens in any browser. |
+| | **Reports** | A formatted Excel workbook for the team (with the set-ups and the fix-loop verdicts) and a detailed report (HTML) with the interactive charts. |
 
 The sidebar holds the filters (calendar weeks, battery type) and the quality rules (tolerance, FPY target,
 squareness limit, whether incomplete modules count as NOK, whether Z decides PASS/FAIL).
@@ -128,7 +138,9 @@ The methods are described in [docs/methodology.md](docs/methodology.md). In shor
 module with Wilson intervals; group differences use Fisher's exact test, Welch's t-test and Brown–Forsythe;
 capability uses the moving-range σ for Cp/Cpk and the overall σ for Pp/Ppk; the error anatomy is an exact
 orthonormal decomposition of the eight deviations; the robust compensation maximises the expected FPY under the
-observed placement noise, and a paired bootstrap tells whether its gain is real or noise.
+observed placement noise, and a paired bootstrap tells whether its gain is real or noise; the fix loop compares
+the modules right before and right after a logged change, never across another one, and says how many modules it
+takes to demonstrate the target (299 in a row without a NOK for 99 %).
 
 ## Project layout
 
@@ -141,8 +153,10 @@ rickhard/             analytics package — no Streamlit imports, every number t
   geometry.py         rigid fit and the eight-mode error decomposition
   compensation.py     median / rigid / robust compensation, gain uncertainty, readiness
   spc.py, patterns.py, zheight.py, events.py, improvement.py, insights.py
+  fixloop.py          set-ups, a verdict per logged action, loss budget, path to target, proof of the target
+  brief.py            the executive brief (one self-contained HTML page)
   report.py, report_html.py   Excel and HTML reports
-  charts/             Plotly figures (colour-blind-safe palette, light and dark)
+  charts/             Plotly figures (colour-blind-safe palette, light and dark); fix_svg.py: static SVG charts
 tests/                pytest suite, the original app's logic for parity checks, page smoke test
 ```
 
@@ -154,7 +168,7 @@ pytest
 ```
 
 The suite checks loading edge cases, parity with the original RICKHARDV formulas, the geometry and compensation
-maths, SPC, insights and both reports, and renders every page in many scenarios. CI runs it on every push. To also
+maths, SPC, insights, the fix loop, the brief and both reports, and renders every page in many scenarios. CI runs it on every push. To also
 compare a real export with the original logic:
 
 ```bash

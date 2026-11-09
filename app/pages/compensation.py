@@ -199,12 +199,13 @@ with right:
         data.set_chosen_compensation(t, (dx, dy, yaw), applied_m, int(weeks))
         st.toast(f"{t}: {applied_m} correction will be used in Path to Target.", icon=":material/check:")
     if st.button("Log as intervention", icon=":material/event_note:", width="stretch",
-                 help="Adds an entry to the Interventions log at the end of the data, so you can measure the effect "
+                 help="Adds an entry to the action log of the Fix Loop at the end of the data, so you can measure the effect "
                       "once new data arrives."):
         state.add_event({"Date": pd.Timestamp(a.first["Date"].max()).isoformat(), "Scope": t, "Category": "Adjustment",
                          "Title": f"Compensation {applied_m}: X {dx:+.2f}, Y {dy:+.2f}, yaw {yaw:+.3f}°",
-                         "Notes": f"From Compensation Studio, window {sug['label']}", "dX": dx, "dY": dy, "dYaw": yaw})
-        st.toast("Added to the Interventions log.", icon=":material/check:")
+                         "Notes": f"From Compensation Studio, window {sug['label']}", "dX": dx, "dY": dy, "dYaw": yaw,
+                         "Status": "Done", "Target": "FPY (general)", "Owner": ""})
+        st.toast("Added to the action log (Fix Loop).", icon=":material/check:")
 
 # ---- Landscape and yaw ----------------------------------------------------------------------------
 left, right = st.columns([3, 2], gap="large")

@@ -50,22 +50,36 @@ def _rel(bat_type: str) -> tuple[np.ndarray, np.ndarray]:
 
 
 def demo_events(spec: DemoSpec = DemoSpec()) -> list[dict]:
-    """The interventions injected into the demo process, as an event log."""
+    """The interventions injected into the demo process, as an action log:
+    three changes that were made, and two next steps that are planned."""
     t0 = pd.Timestamp(spec.start)
+    end = t0 + pd.Timedelta(weeks=spec.weeks)
     return [
         {"Date": (t0 + pd.Timedelta(days=36, hours=10, minutes=30)).isoformat(),
          "Scope": "Type S", "Category": "Adjustment",
          "Title": "Conveyor end-stop moved −0.9 mm in X",
          "Notes": "Type S modules were landing long (front corners +X).",
-         "dX": -0.9, "dY": 0.0, "dYaw": 0.0},
+         "dX": -0.9, "dY": 0.0, "dYaw": 0.0, "Status": "Done", "Target": "Shift X", "Owner": "Maintenance"},
         {"Date": (t0 + pd.Timedelta(days=56, hours=7)).isoformat(),
          "Scope": "All", "Category": "Training",
          "Title": "Night-shift operator refresher",
-         "Notes": "No machine change.", "dX": 0.0, "dY": 0.0, "dYaw": 0.0},
+         "Notes": "No machine change.", "dX": 0.0, "dY": 0.0, "dYaw": 0.0,
+         "Status": "Done", "Target": "FPY (general)", "Owner": "Production"},
         {"Date": (t0 + pd.Timedelta(days=73, hours=15)).isoformat(),
          "Scope": "All", "Category": "Maintenance",
          "Title": "Side guide rail realigned, worn pads replaced",
-         "Notes": "Yaw had been drifting for several weeks.", "dX": 0.0, "dY": 0.0, "dYaw": 0.0},
+         "Notes": "Yaw had been drifting for several weeks.", "dX": 0.0, "dY": 0.0, "dYaw": 0.0,
+         "Status": "Done", "Target": "Yaw", "Owner": "Maintenance"},
+        {"Date": (end + pd.Timedelta(days=2, hours=8)).isoformat(),
+         "Scope": "Type M", "Category": "Adjustment",
+         "Title": "Centre the Type M placement in X and Y",
+         "Notes": "Offset left after the guide rail work; values from Compensation Studio.",
+         "dX": None, "dY": None, "dYaw": None, "Status": "Planned", "Target": "Shift Y", "Owner": "Process"},
+        {"Date": (end + pd.Timedelta(days=9, hours=8)).isoformat(),
+         "Scope": "All", "Category": "Software",
+         "Title": "Re-teach the vision job for missed corner reads",
+         "Notes": "Missing corners count as NOK.", "dX": None, "dY": None, "dYaw": None,
+         "Status": "Planned", "Target": "Missing corner", "Owner": "Quality"},
     ]
 
 

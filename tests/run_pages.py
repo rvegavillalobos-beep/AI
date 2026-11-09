@@ -23,7 +23,7 @@ import streamlit as st  # noqa: E402  (the stub)
 
 assert hasattr(st, "run_app"), "the Streamlit stub was not picked up"
 
-PAGES = ["command", "corners", "geometry", "shape", "drift", "anatomy", "spc", "patterns", "height",
+PAGES = ["command", "brief", "corners", "geometry", "shape", "drift", "anatomy", "spc", "patterns", "height",
          "target", "compensation", "events", "passport", "data", "reports"]
 
 
@@ -83,6 +83,20 @@ def main() -> int:
     results.append(scenario("all pages, one week", "command", before=narrow_weeks))
     for p in PAGES[1:]:
         results.append(scenario(f"{p} (one week)", p))
+
+    # the fix loop and the brief before anything is logged, and with planned actions only
+    def empty_log():
+        st.session_state["events"] = []
+    results.append(scenario("fix loop with an empty log", "events", before=empty_log))
+    results.append(scenario("brief with an empty log", "brief"))
+
+    def planned_only():
+        st.session_state["events"] = [{"Date": "2026-12-01T08:00:00", "Scope": "All", "Category": "Adjustment",
+                                       "Title": "Shim the end-stop", "Status": "Planned", "Target": "Shift X",
+                                       "Owner": "Maintenance"}]
+    results.append(scenario("fix loop with planned actions only", "events", before=planned_only))
+    results.append(scenario("brief with planned actions only", "brief"))
+    results.append(scenario("reports with planned actions only", "reports", click={"rep_xlsx_go", "rep_html_go"}))
 
     # a fresh session opened with "?demo" in the address lands on the demo data
     def fresh_with_demo_param():

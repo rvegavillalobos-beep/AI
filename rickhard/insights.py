@@ -277,7 +277,7 @@ def generate(a: Analysis, extras: dict | None = None) -> tuple[list[Insight], li
             unit = "°" if "Yaw" in str(c["Variable"]) else " mm"
             bits.append(f"{c['Variable']} {c['Shift']:+.2f}{unit} on {pd.Timestamp(c['Date']):%b %d}")
         out.append(Insight("info", "Process shifts detected", "Dated level changes: " + "; ".join(bits)
-                           + ". Log what was done then in **Interventions** to measure its effect.",
+                           + ". Log what was done then in the **Fix Loop** to measure its effect.",
                            "change", page="events", score=9))
 
     # 12 — shifts

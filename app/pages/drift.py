@@ -71,7 +71,7 @@ if len(tab):
                      "Before": cfg.NumberColumn("Level before", format="%+.3f"),
                      "After": cfg.NumberColumn("Level after", format="%+.3f"),
                      "Shift": cfg.NumberColumn("Shift", format="%+.3f"), "p": cfg.NumberColumn("p-value", format="%.1e")})
-    st.caption("Log what was done at those dates in **Interventions** to measure each change; a shift you cannot "
+    st.caption("Log what was done at those dates in the **Fix Loop** to measure each change; a shift you cannot "
                "explain is worth an investigation.")
 else:
     st.caption("No significant level shift detected in the placement.")
