@@ -286,7 +286,8 @@ def test_brief(demo_analysis, loop):
     assert loop["story"]["headline"] in text.replace("&#x27;", "'")
     assert "Conveyor end-stop moved −0.9 mm in X" in text and "Re-teach the vision job" in text
     plain = brief.build(demo_analysis, loop)                    # no requests: the block is left out
-    assert "What we need" not in plain
+    assert "What we need" not in plain and "Demo data" not in plain
+    assert "Demo data · invented numbers" in brief.build(demo_analysis, loop, demo=True)
     assert brief.fragment(demo_analysis, loop).startswith("<div class='xb'>")
 
 

@@ -40,6 +40,8 @@ def css() -> str:
 .xb-head {{display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;
            border-bottom:2px solid #0b0b0b; padding-bottom:10px;}}
 .xb-eyebrow {{font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:#52514e; font-weight:600;}}
+.xb-demo {{margin-left:10px; padding:1px 8px; border-radius:999px; background:#fab219; color:#0b0b0b;
+           letter-spacing:.04em;}}
 .xb-title {{font-size:26px; font-weight:750; line-height:1.15; margin:2px 0 0 0;}}
 .xb-meta {{font-size:12px; color:#52514e; text-align:right;}}
 .xb-headline {{font-size:21px; font-weight:650; line-height:1.3; margin:18px 0 6px 0; padding-left:14px;
@@ -191,23 +193,27 @@ def _next_steps(loop: dict) -> tuple[str, str]:
     return planned, "".join(out)
 
 
-def fragment(a, loop: dict, title: str = DEFAULT_TITLE, author: str = "", asks: str = "", note: str = "") -> str:
-    """The brief without the document skeleton (charts in the light palette)."""
+def fragment(a, loop: dict, title: str = DEFAULT_TITLE, author: str = "", asks: str = "", note: str = "",
+             demo: bool = False) -> str:
+    """The brief without the document skeleton (charts in the light palette).
+    ``demo`` stamps the page as synthetic data, so a demo brief cannot be
+    mistaken for the line's figures."""
     prev = T.pal().dark
     T.set_dark(False)
     try:
-        return _fragment(a, loop, title, author, asks, note)
+        return _fragment(a, loop, title, author, asks, note, demo)
     finally:
         T.set_dark(prev)
 
 
-def _fragment(a, loop: dict, title: str, author: str, asks: str, note: str) -> str:
+def _fragment(a, loop: dict, title: str, author: str, asks: str, note: str, demo: bool = False) -> str:
     r, f = a.settings.rules, a.first
     target = loop["target"]
     span = f"{f['Date'].min():%b %d} – {f['Date'].max():%b %d, %Y}" if len(f) else "–"
     by = f"{_e(author)} · " if author.strip() else ""
+    stamp = "<span class='xb-demo'>Demo data · invented numbers</span>" if demo else ""
     head = (f"<div class='xb-head'><div><div class='xb-eyebrow'>Station ST020 · module corner deviation · first "
-            f"measurement</div><div class='xb-title'>{_e(title)}</div></div>"
+            f"measurement{stamp}</div><div class='xb-title'>{_e(title)}</div></div>"
             f"<div class='xb-meta'>{span} · {_e(a.scope.label_types())} · tolerance ±{r.spec_limit:g} mm<br>"
             f"{by}{datetime.now():%Y-%m-%d}{(' · ' + _e(note)) if note.strip() else ''}</div></div>")
     if loop["setup"] is None:
@@ -276,9 +282,10 @@ def _fragment(a, loop: dict, title: str, author: str, asks: str, note: str) -> s
     return "".join(parts)
 
 
-def build(a, loop: dict, title: str = DEFAULT_TITLE, author: str = "", asks: str = "", note: str = "") -> str:
+def build(a, loop: dict, title: str = DEFAULT_TITLE, author: str = "", asks: str = "", note: str = "",
+          demo: bool = False) -> str:
     """The complete, self-contained HTML file."""
-    return wrap(fragment(a, loop, title, author, asks, note), title)
+    return wrap(fragment(a, loop, title, author, asks, note, demo), title)
 
 
 def wrap(body: str, title: str = DEFAULT_TITLE) -> str:
@@ -296,7 +303,7 @@ def wrap(body: str, title: str = DEFAULT_TITLE) -> str:
  @media print {{
    html {{background:#fff;}} body {{padding:0;}}
    .xb-page {{max-width:none; box-shadow:none; padding:0; border-radius:0;}}
-   .xb-chip, .xb-no, .xb-h .n {{-webkit-print-color-adjust:exact; print-color-adjust:exact;}}
+   .xb-chip, .xb-no, .xb-h .n, .xb-demo {{-webkit-print-color-adjust:exact; print-color-adjust:exact;}}
  }}
 {css()}
 </style></head><body><div class="xb-page">{body}</div></body></html>"""

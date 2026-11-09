@@ -28,7 +28,8 @@ with right:
                                     "Supplier review of module squareness",
                         help="Shown as its own block at the end of the brief. Leave empty to leave the block out.")
 
-body = brief.fragment(a, loop, title=title or brief.DEFAULT_TITLE, author=author, asks=asks, note=note)
+body = brief.fragment(a, loop, title=title or brief.DEFAULT_TITLE, author=author, asks=asks, note=note,
+                      demo=state.is_demo())
 doc = brief.wrap(body, title or brief.DEFAULT_TITLE)
 
 b1, b2 = st.columns([2, 3], vertical_alignment="center")
@@ -39,7 +40,7 @@ with b2:
     st.caption("One self-contained file: it opens in any browser, also offline, and can be mailed as it is. "
                "Print it from the browser (landscape) for a PDF — three pages that read like slides.")
 if state.is_demo():
-    st.caption(":orange[Demo data: the story below is invented.]")
+    st.caption(":orange[Demo data: the story below is invented, and the brief is stamped as demo.]")
 if loop["score"]["done"] == 0:
     st.info("No change to the line is logged yet, so the brief has one set-up and no verdicts. Log what was done in "
             "the **Fix Loop** — that is what turns the numbers into a story.", icon=":material/autorenew:")
