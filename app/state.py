@@ -8,6 +8,7 @@ survive navigating between pages.
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 
 import streamlit as st
@@ -94,6 +95,23 @@ def clear_files() -> None:
     for k in ("_files", "_files_hash", "_demo"):
         st.session_state.pop(k, None)
     reset_page_widgets()
+
+
+def renew_settings_objects() -> None:
+    """Rebuild the settings a session kept from before an update with today's classes.
+
+    After the app's modules were re-imported (``refresh_code`` in streamlit_app.py) an object made by the old
+    module is no instance of the new class of the same name, and results that contain it cannot be cached.
+    Fields the new class no longer has are dropped; an object that cannot be rebuilt goes back to the default."""
+    for key, cls in (("load_opts", LoadOptions), ("nominals", Nominals), ("shifts", ShiftPlan)):
+        obj = st.session_state.get(key)
+        if obj is None or type(obj) is cls:
+            continue
+        try:
+            st.session_state[key] = cls(**{f.name: getattr(obj, f.name) for f in dataclasses.fields(cls)
+                                           if hasattr(obj, f.name)})
+        except Exception:  # noqa: BLE001 - whatever the old object was, the default always works
+            del st.session_state[key]
 
 
 def load_options() -> LoadOptions:

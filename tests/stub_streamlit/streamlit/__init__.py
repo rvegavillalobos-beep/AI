@@ -552,6 +552,7 @@ def _cache(func=None, **kw):
 CACHE_COPY = [True]
 cache_data = _cache
 cache_resource = _cache
+_cache.clear = lambda: None        # st.cache_data.clear(): every function keeps its own store here
 
 
 def fragment(func=None, *, run_every=None):

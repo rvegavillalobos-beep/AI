@@ -98,6 +98,30 @@ def main() -> int:
     results.append(scenario("brief with planned actions only", "brief"))
     results.append(scenario("reports with planned actions only", "reports", click={"rep_xlsx_go", "rep_html_go"}))
 
+    # an update pulled into a running app: the main script is new, the imported modules are old
+    def stale_modules():
+        import sys
+        import types
+
+        from app import ui as old_ui
+        old = types.ModuleType("app.ui")
+        old.__dict__.update({k: v for k, v in vars(old_ui).items() if not k.startswith("__")})
+        old.PAGE_TITLES = {k: v for k, v in old_ui.PAGE_TITLES.items() if k != "brief"}
+        sys.modules["app.ui"] = sys.modules["app"].ui = old
+        sys._st020_sources = None                    # the source files changed since the last run
+        from rickhard.config import Nominals         # a setting made with the class as it was before the update
+        st.session_state["nominals"] = Nominals.from_dict({"Type S": {"FL": (1.0, 2.0)}})
+        st.session_state["shifts"] = object()        # something that cannot be rebuilt
+    results.append(scenario("update pulled into a running app", "brief", before=stale_modules))
+    from rickhard.config import Nominals as _Nominals
+    from rickhard.config import ShiftPlan as _ShiftPlan
+    kept, plan = st.session_state.get("nominals"), st.session_state.get("shifts")
+    ok = type(kept) is _Nominals and kept.as_dict()["Type S"]["FL"] == (1.0, 2.0) and plan == _ShiftPlan()
+    results.append({"scenario": "settings survive the update", "status": "ok" if ok else "ERROR", "seconds": 0.0,
+                    "error": None if ok else f"nominals {kept!r} / shifts {plan!r}", "st_errors": []})
+    for k in ("nominals", "shifts"):
+        st.session_state.pop(k, None)
+
     # a fresh session opened with "?demo" in the address lands on the demo data
     def fresh_with_demo_param():
         st.session_state.clear()

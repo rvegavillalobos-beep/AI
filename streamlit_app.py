@@ -3,14 +3,50 @@
 Run with:  streamlit run streamlit_app.py
 """
 
+import sys
+from pathlib import Path
+
 import streamlit as st
 
 st.set_page_config(page_title="ST020 Corner Analytics", page_icon=":material/crop_free:",
                    layout="wide", initial_sidebar_state="auto")
 
-from app import data, sidebar, state, ui  # noqa: E402  (page config must come first)
+_ROOT = Path(__file__).resolve().parent
+_PACKAGES = ("app", "rickhard")
+
+
+def _source_signature() -> tuple:
+    files = [p for pkg in _PACKAGES for p in (_ROOT / pkg).rglob("*.py")]
+    stats = [p.stat() for p in files]
+    return len(files), max((s.st_mtime_ns for s in stats), default=0), sum(s.st_size for s in stats)
+
+
+def refresh_code() -> bool:
+    """Drop the app's own modules when their source changed under a running app.
+
+    A host that pulls an update into a running app (Streamlit Community Cloud) re-reads this script but can keep
+    the packages it imported before, so new code meets old modules — a page that exists here and not in the old
+    ``app.ui``, for one. Comparing a signature of the source files on every run and re-importing on a change keeps
+    the two in step. True when modules were dropped."""
+    sig = _source_signature()
+    if getattr(sys, "_st020_sources", None) == sig:
+        return False
+    sys._st020_sources = sig
+    stale = [m for m in list(sys.modules) if m.split(".")[0] in _PACKAGES]
+    for m in stale:
+        del sys.modules[m]
+    if stale:                       # results computed by the old code may not fit the new one
+        st.cache_data.clear()
+        st.cache_resource.clear()
+    return bool(stale)
+
+
+refresh_code()
+
+from app import data, sidebar, state, ui  # noqa: E402  (page config and the refresh must come first)
 from rickhard.charts import theme  # noqa: E402
 
+state.renew_settings_objects()
 state.keep_widget_state()
 for _k, _v in (st.session_state.pop("_pending_rules", None) or {}).items():
     st.session_state[_k] = _v
