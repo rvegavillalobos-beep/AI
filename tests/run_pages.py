@@ -109,9 +109,10 @@ def main() -> int:
         old.PAGE_TITLES = {k: v for k, v in old_ui.PAGE_TITLES.items() if k != "brief"}
         sys.modules["app.ui"] = sys.modules["app"].ui = old
         sys._st020_sources = None                    # the source files changed since the last run
-        from rickhard.config import Nominals         # a setting made with the class as it was before the update
+        # a setting made with the class as it was before the update, and one that cannot be rebuilt
+        from rickhard.config import Nominals
         st.session_state["nominals"] = Nominals.from_dict({"Type S": {"FL": (1.0, 2.0)}})
-        st.session_state["shifts"] = object()        # something that cannot be rebuilt
+        st.session_state["shifts"] = object()
     results.append(scenario("update pulled into a running app", "brief", before=stale_modules))
     from rickhard.config import Nominals as _Nominals
     from rickhard.config import ShiftPlan as _ShiftPlan
