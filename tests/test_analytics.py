@@ -119,6 +119,24 @@ def test_startup_flags():
     assert list(f) == [True, True, False, False, True, True, False]
 
 
+def test_daily_fpy_is_the_weekly_table_per_production_day(demo_analysis):
+    a = demo_analysis
+    d = a.daily
+    assert list(d.columns) == metrics.DAILY_COLUMNS
+    assert d["Day"].is_monotonic_increasing and d["Day"].is_unique
+    assert (d["Day"] == d["Day"].dt.normalize()).all()
+    assert (d["Total"] > 0).all()                                 # days without modules are not listed
+    for col in ("Total", "Passed", "Failed", "Incomplete", "NearMiss"):
+        assert d[col].sum() == a.weekly[col].sum()
+    one = d.iloc[len(d) // 2]
+    f = a.first[pd.to_datetime(a.first["Date"]).dt.normalize() == one["Day"]]
+    assert one["Total"] == len(f)
+    assert one["PassRate"] == pytest.approx(metrics.fpy(f))
+    assert one["CI_lo"] <= one["PassRate"] <= one["CI_hi"]
+    assert d["MA_FPY"].iloc[2] == pytest.approx(d["PassRate"].iloc[:3].mean())   # MA3 over production days
+    assert list(metrics.daily_fpy(a.first.iloc[:0]).columns) == metrics.DAILY_COLUMNS
+
+
 def test_levers(demo_analysis):
     f = demo_analysis.first
     today = improvement.fpy_after(f, improvement.Levers(), None, 3.0, NOM)

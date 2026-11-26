@@ -78,8 +78,8 @@ if state.files():
             sidebar.file_card(ds)
         else:
             sidebar.file_card(ds)
-            settings, scope, week_label, ma = sidebar.filters_and_rules(ds)
-            context = data.make_context(ds, ds_key, settings, scope, ma, week_label)
+            settings, scope, week_label, ma, trend = sidebar.filters_and_rules(ds)
+            context = data.make_context(ds, ds_key, settings, scope, ma, week_label, trend)
 st.session_state["_ctx"] = context
 
 

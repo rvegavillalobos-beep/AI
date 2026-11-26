@@ -83,6 +83,7 @@ class Context:
     ma: int
     file_label: str
     is_demo: bool
+    trend: str = "week"      # FPY trend on the Command Center: "week" or "day" (sidebar switch)
 
     @property
     def rules(self):
@@ -101,13 +102,14 @@ class Context:
         return events_frame()
 
 
-def make_context(ds: Dataset, ds_key: str, settings: Settings, scope: Scope, ma: int, week_label: str) -> Context:
+def make_context(ds: Dataset, ds_key: str, settings: Settings, scope: Scope, ma: int, week_label: str,
+                 trend: str = "week") -> Context:
     key = f"{ds_key}|{settings!r}|{scope!r}|{ma}"
     a = _analysis(key, ds, settings, scope, ma)
     names = [f["name"] for f in state.files()]
     label = names[0] if len(names) == 1 else f"{len(names)} files"
     return Context(ds=ds, a=a, key=key, settings=settings, scope=scope, week_label=week_label, ma=ma,
-                   file_label=label, is_demo=state.is_demo())
+                   file_label=label, is_demo=state.is_demo(), trend=trend)
 
 
 def ctx() -> Context:

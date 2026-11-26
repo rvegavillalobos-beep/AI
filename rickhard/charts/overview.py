@@ -13,16 +13,44 @@ from ..constants import CORNER_LABELS, CORNERS, MECHANISMS
 from ..geometry import polygon
 from . import theme as T
 
+DAY_MS = 86_400_000       # one day on a Plotly date axis
+DAY_LABELS_MAX = 21       # above this many days the points carry no % label (they would overlap)
+
 
 def weekly_fpy(weekly: pd.DataFrame, target: float, ma_window: int, show_incomplete: bool = False,
                events: pd.DataFrame | None = None, title: str | None = None, height: int = 440) -> go.Figure:
     """FPY per week (line + 95 % CI + moving average + target) above the
     weekly volume (stacked OK / NOK). Two panels, one shared week axis."""
+    return fpy_trend(weekly, target, ma_window, show_incomplete, events, title, height, period="week")
+
+
+def daily_fpy(daily: pd.DataFrame, target: float, ma_window: int, show_incomplete: bool = False,
+              events: pd.DataFrame | None = None, title: str | None = None, height: int = 440) -> go.Figure:
+    """The same figure as ``weekly_fpy`` with one point per production day
+    (``metrics.daily_fpy``) on a date axis, so days without production show
+    as gaps and interventions sit on their own day."""
+    return fpy_trend(daily, target, ma_window, show_incomplete, events, title, height, period="day")
+
+
+def fpy_trend(table: pd.DataFrame, target: float, ma_window: int, show_incomplete: bool = False,
+              events: pd.DataFrame | None = None, title: str | None = None, height: int = 440,
+              period: str = "week") -> go.Figure:
+    """FPY per period above the volume per period; ``period`` is "week"
+    (category axis of calendar weeks) or "day" (date axis)."""
     P = T.pal()
-    if weekly is None or weekly.empty:
+    if table is None or table.empty:
         return T.empty("No first runs in the current filters.")
-    w = weekly.copy()
-    x = w["CalendarWeek"].tolist()
+    daily = period == "day"
+    w = table.copy()
+    if daily:
+        days = pd.to_datetime(w["Day"])
+        x = days.dt.strftime("%Y-%m-%d").tolist()
+        x_hover = "%{x|%a %d %b %Y}"
+    else:
+        x = w["CalendarWeek"].tolist()
+        x_hover = "%{x}"
+    n = len(x)
+    labelled = not daily or n <= DAY_LABELS_MAX
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3], vertical_spacing=0.05)
     fig.add_trace(go.Scatter(x=x + x[::-1], y=list(w["CI_hi"]) + list(w["CI_lo"])[::-1], fill="toself",
                              fillcolor=T.rgba(P.accent, 0.10), line=dict(width=0), hoverinfo="skip",
@@ -31,15 +59,17 @@ def weekly_fpy(weekly: pd.DataFrame, target: float, ma_window: int, show_incompl
                              line=dict(color=P.ma, width=2, dash="dash"),
                              hovertemplate=f"MA{ma_window}: %{{y:.1f}}%<extra></extra>"), row=1, col=1)
     low = w["LowSample"].to_numpy(bool)
+    size = 9 if labelled else (7 if n <= 60 else 5)
     fig.add_trace(go.Scatter(
-        x=x, y=w["PassRate"], mode="lines+markers+text", name="Weekly FPY",
-        line=dict(color=P.accent, width=2.5),
-        marker=dict(size=9, color=[P.ink["surface"] if lo else P.accent for lo in low],
-                    line=dict(color=P.accent, width=2)),
-        text=[f"{v:.0f}%{'*' if lo else ''}" for v, lo in zip(w["PassRate"], low)], textposition="top center",
-        textfont=dict(size=10, color=P.ink["secondary"]), cliponaxis=False,
+        x=x, y=w["PassRate"], mode="lines+markers+text" if labelled else "lines+markers",
+        name="Daily FPY" if daily else "Weekly FPY",
+        line=dict(color=P.accent, width=2.5 if labelled else 2),
+        marker=dict(size=size, color=[P.ink["surface"] if lo else P.accent for lo in low],
+                    line=dict(color=P.accent, width=2 if labelled else 1.5)),
+        text=[f"{v:.0f}%{'*' if lo else ''}" for v, lo in zip(w["PassRate"], low)] if labelled else None,
+        textposition="top center", textfont=dict(size=10, color=P.ink["secondary"]), cliponaxis=False,
         customdata=np.stack([w["Total"], w["Passed"], w["Failed"], w["CI_lo"], w["CI_hi"]], axis=1),
-        hovertemplate=("<b>%{x}</b><br>FPY %{y:.1f}%  (CI %{customdata[3]:.0f}–%{customdata[4]:.0f}%)"
+        hovertemplate=(f"<b>{x_hover}</b><br>FPY %{{y:.1f}}%  (CI %{{customdata[3]:.0f}}–%{{customdata[4]:.0f}}%)"
                        "<br>%{customdata[1]} OK · %{customdata[2]} NOK of %{customdata[0]}<extra></extra>")),
         row=1, col=1)
     T.hline(fig, target, P.target, "dot", 2, f"Target {target:.0f}%", "top left", row=1, col=1)
@@ -51,15 +81,30 @@ def weekly_fpy(weekly: pd.DataFrame, target: float, ma_window: int, show_incompl
             continue
         fig.add_trace(go.Bar(x=x, y=w[col], name=f"{name} modules", marker_color=color,
                              marker_line=dict(width=1, color=P.ink["surface"]), opacity=0.85,
-                             hovertemplate=f"%{{x}}: %{{y}} {name}<extra></extra>"), row=2, col=1)
+                             # on a date axis a bar is as wide as given (in ms); a single day would be a hairline
+                             width=0.65 * DAY_MS if daily else None,
+                             hovertemplate=f"{x_hover}: %{{y}} {name}<extra></extra>"), row=2, col=1)
     fig.update_layout(barmode="stack", bargap=0.35)
     fig.update_yaxes(title_text="Modules", row=2, col=1, rangemode="tozero")
-    if events is not None and len(events) and "CalendarWeek" in events:
-        ev = events[events["CalendarWeek"].isin(x)]
-        if len(ev):
-            T.event_marks(fig, ev["CalendarWeek"], ev["Title"], rows=[1, 2], max_chars=20)
-    fig.update_xaxes(type="category", row=1, col=1)
-    fig.update_xaxes(type="category", row=2, col=1)
+    if events is not None and len(events):
+        if daily and "Date" in events:
+            ev_x = pd.to_datetime(events["Date"], errors="coerce").dt.normalize()
+            keep = ev_x.between(days.min(), days.max())
+            if keep.any():
+                T.event_marks(fig, ev_x[keep].dt.strftime("%Y-%m-%d"), events.loc[keep, "Title"], rows=[1, 2],
+                              max_chars=20)
+        elif not daily and "CalendarWeek" in events:
+            ev = events[events["CalendarWeek"].isin(x)]
+            if len(ev):
+                T.event_marks(fig, ev["CalendarWeek"], ev["Title"], rows=[1, 2], max_chars=20)
+    if daily:
+        # a short span gets one tick per day (otherwise Plotly ticks every few hours)
+        ticks = dict(dtick=DAY_MS, tickformat="%d %b") if (days.max() - days.min()).days <= 10 else {}
+        for row in (1, 2):
+            fig.update_xaxes(type="date", row=row, col=1, **ticks)
+    else:
+        fig.update_xaxes(type="category", row=1, col=1)
+        fig.update_xaxes(type="category", row=2, col=1)
     return T.style(fig, height=height, title=title, margin=dict(b=24))
 
 

@@ -61,10 +61,17 @@ with right:
     st.page_link("app/pages/events.py", label="Did the changes work? — Fix Loop", icon=":material/autorenew:")
     st.page_link("app/pages/brief.py", label="One page for management — Executive Brief", icon=":material/article:")
 
-# ---- Weekly FPY ------------------------------------------------------------------------------
-ui.section("Weekly first-pass yield", "Line: FPY of the first measurement per week, band: 95% confidence interval, "
-                                     "dashed: moving average. Bars: modules measured. Diamonds: logged interventions.")
-ui.chart(co.weekly_fpy(a.weekly, r.fpy_target, c.ma, not r.incomplete_as_fail, c.events), "cc_weekly")
+# ---- FPY trend: per week or per day (sidebar switch) -----------------------------------------
+daily = c.trend == "day"
+per = "day" if daily else "week"
+ui.section("Daily first-pass yield" if daily else "Weekly first-pass yield",
+           f"Line: FPY of the first measurement per {per}, band: 95% confidence interval, dashed: moving average "
+           f"over {c.ma} {per}s. Bars: modules measured. Diamonds: logged interventions. "
+           "Switch between daily and weekly in the sidebar (Daily FPY).")
+if daily:
+    ui.chart(co.daily_fpy(a.daily, r.fpy_target, c.ma, not r.incomplete_as_fail, c.events), "cc_daily")
+else:
+    ui.chart(co.weekly_fpy(a.weekly, r.fpy_target, c.ma, not r.incomplete_as_fail, c.events), "cc_weekly")
 
 # ---- Why and where ---------------------------------------------------------------------------
 help_mech = "  \n".join(f"**{m}** — {t}" for m, t in MECHANISM_HELP.items())
@@ -89,13 +96,14 @@ with col4:
     ui.section("First run by battery type")
     ui.chart(co.status_by_type(a.first), "cc_type")
 
-with st.expander("Week by week", icon=":material/table_rows:"):
-    wk = a.weekly.iloc[::-1]
-    cols = ["CalendarWeek", "Total", "Passed", "Failed"] + (["Incomplete"] if not r.incomplete_as_fail else []) \
-        + ["PassRate", "CI_lo", "CI_hi", "MA_FPY", "NearMissRate"]
+with st.expander("Day by day" if daily else "Week by week", icon=":material/table_rows:"):
+    wk = (a.daily if daily else a.weekly).iloc[::-1]
+    cols = ["Day" if daily else "CalendarWeek", "Total", "Passed", "Failed"] \
+        + (["Incomplete"] if not r.incomplete_as_fail else []) + ["PassRate", "CI_lo", "CI_hi", "MA_FPY", "NearMissRate"]
     cc = st.column_config
     st.dataframe(wk[cols], hide_index=True, width="stretch", height=min(460, 40 + 35 * len(wk)), column_config={
-        "CalendarWeek": cc.TextColumn("Week"), "Total": cc.NumberColumn("Modules"), "Passed": cc.NumberColumn("OK"),
+        "CalendarWeek": cc.TextColumn("Week"), "Day": cc.DateColumn("Day", format="ddd DD MMM YYYY"),
+        "Total": cc.NumberColumn("Modules"), "Passed": cc.NumberColumn("OK"),
         "Failed": cc.NumberColumn("NOK"),
         "PassRate": cc.ProgressColumn("FPY", format="%.1f%%", min_value=0, max_value=100),
         "CI_lo": cc.NumberColumn("CI low", format="%.1f%%"), "CI_hi": cc.NumberColumn("CI high", format="%.1f%%"),

@@ -28,6 +28,7 @@ class Analysis:
     kpis: dict
     has_z: bool = False
     limits: dict = field(default_factory=dict)
+    daily: pd.DataFrame = field(default_factory=lambda: pd.DataFrame(columns=metrics.DAILY_COLUMNS))
 
     @property
     def types(self) -> list[str]:
@@ -91,13 +92,14 @@ def analyze(runs_all: pd.DataFrame, settings: Settings, scope: Scope, ma_window:
     sq_first = first[first["SquarenessStatus"].notna()].copy() if len(first) else first.copy()
 
     weekly = metrics.weekly_fpy(first, ma_window, near_miss=r.near_miss)
+    daily = metrics.daily_fpy(first, ma_window, near_miss=r.near_miss)
     pareto = metrics.corner_pareto(first, r.spec_limit)
     mechs = metrics.mechanism_summary(first)
     cap = metrics.capability(first, r.spec_limit, z_limits=(r.z_lo, r.z_hi) if has_z else None)
     k = metrics.kpis(first, runs, weekly, cap, sq_first, r.near_miss, r.fpy_target)
     return Analysis(settings=settings, scope=scope, runs=runs, first=first, weekly=weekly, pareto=pareto,
                     mechanisms=mechs, capability=cap, sq_first=sq_first, sq_runs=sq_runs, kpis=k,
-                    has_z=has_z, limits=limits or {})
+                    has_z=has_z, limits=limits or {}, daily=daily)
 
 
 def complete_first(a: Analysis, bat_type: str | None = None) -> pd.DataFrame:

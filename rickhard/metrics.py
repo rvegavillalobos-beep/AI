@@ -48,24 +48,27 @@ WEEKLY_COLUMNS = ["WeekKey", "CalendarWeek", "Total", "Passed", "Failed", "Incom
                   "CI_lo", "CI_hi", "LowSample", "MA_FPY", "NearMiss", "NearMissRate"]
 
 
-def weekly_fpy(first: pd.DataFrame, ma_window: int = 3, low_sample: int = 5,
-               near_miss: float | None = None) -> pd.DataFrame:
-    if first.empty:
-        return pd.DataFrame(columns=WEEKLY_COLUMNS)
+DAILY_COLUMNS = ["Day"] + WEEKLY_COLUMNS[2:]
+
+
+def _fpy_by_period(first: pd.DataFrame, keys: list[str], ma_window: int, low_sample: int,
+                   near_miss: float | None) -> pd.DataFrame:
+    """FPY, 95 % CI, moving average and near misses per period (``keys``, the
+    first one sorts chronologically). Shared by the weekly and the daily trend."""
     f = first.assign(_p=first["Status"] == "PASS", _f=first["Status"] == "FAIL",
                      _i=first["Status"] == "INCOMPLETE")
     if near_miss is not None and "Margin" in f:
         f["_nm"] = f["_p"] & (f["Margin"] < near_miss)
     else:
         f["_nm"] = False
-    g = f.groupby(["WeekKey", "CalendarWeek"], sort=True)
+    g = f.groupby(keys, sort=True)
     w = pd.DataFrame({
         "Total": g.size(),
         "Passed": g["_p"].sum().astype(int),
         "Failed": g["_f"].sum().astype(int),
         "Incomplete": g["_i"].sum().astype(int),
         "NearMiss": g["_nm"].sum().astype(int),
-    }).reset_index().sort_values("WeekKey")
+    }).reset_index().sort_values(keys[0])
     w["PassRate"] = w["Passed"] / w["Total"] * 100
     ci = [wilson(int(k), int(n)) for k, n in zip(w["Passed"], w["Total"])]
     w["CI_lo"] = [c[0] for c in ci]
@@ -73,17 +76,27 @@ def weekly_fpy(first: pd.DataFrame, ma_window: int = 3, low_sample: int = 5,
     w["LowSample"] = w["Total"] < low_sample
     w["MA_FPY"] = w["PassRate"].rolling(window=max(1, int(ma_window)), min_periods=1).mean()
     w["NearMissRate"] = w["NearMiss"] / w["Total"] * 100
+    return w
+
+
+def weekly_fpy(first: pd.DataFrame, ma_window: int = 3, low_sample: int = 5,
+               near_miss: float | None = None) -> pd.DataFrame:
+    if first.empty:
+        return pd.DataFrame(columns=WEEKLY_COLUMNS)
+    w = _fpy_by_period(first, ["WeekKey", "CalendarWeek"], ma_window, low_sample, near_miss)
     return w[WEEKLY_COLUMNS].reset_index(drop=True)
 
 
-def daily_fpy(first: pd.DataFrame) -> pd.DataFrame:
+def daily_fpy(first: pd.DataFrame, ma_window: int = 3, low_sample: int = 5,
+              near_miss: float | None = None) -> pd.DataFrame:
+    """The same table as ``weekly_fpy`` with one row per production day
+    (``Day``, midnight); days without modules are not listed. The moving
+    average runs over that many production days."""
     if first.empty:
-        return pd.DataFrame(columns=["Day", "Total", "Passed", "PassRate"])
-    d = first.assign(Day=pd.to_datetime(first["Date"]).dt.normalize(), _p=first["Status"] == "PASS")
-    g = d.groupby("Day")
-    out = pd.DataFrame({"Total": g.size(), "Passed": g["_p"].sum()}).reset_index()
-    out["PassRate"] = out["Passed"] / out["Total"] * 100
-    return out
+        return pd.DataFrame(columns=DAILY_COLUMNS)
+    d = first.assign(Day=pd.to_datetime(first["Date"]).dt.normalize())
+    w = _fpy_by_period(d, ["Day"], ma_window, low_sample, near_miss)
+    return w[DAILY_COLUMNS].reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------

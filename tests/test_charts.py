@@ -62,3 +62,26 @@ def test_diagonal_trend_is_one_point_per_module_in_order():
     assert list(pts["Diag FR–RL"].y) == pytest.approx(dims["Diag FR–RL"].to_numpy())
     assert list(pts["Difference (square)"].y) == pytest.approx(dims["Diagonal difference"].to_numpy())
     assert any(s.x0 == 11.5 for s in fig.layout.shapes if s.type == "line" and s.x0 == s.x1)  # after module 11
+
+
+def test_fpy_trend_per_day_sits_on_a_date_axis_with_interventions_on_their_day(demo_analysis):
+    from rickhard.charts import overview as co
+
+    d = demo_analysis.daily
+    day = d["Day"].iloc[5]
+    ev = pd.DataFrame({"Date": [day + pd.Timedelta(hours=10), d["Day"].iloc[-1] + pd.Timedelta(days=30)],
+                       "Title": ["Shim the end-stop", "Outside the data"]})
+    fig = co.daily_fpy(d, 99.0, 3, events=ev)
+    line = next(t for t in fig.data if t.name == "Daily FPY")
+    assert list(line.x) == list(d["Day"].dt.strftime("%Y-%m-%d"))
+    assert fig.layout.xaxis.type == fig.layout.xaxis2.type == "date"
+    marks = {s.x0 for s in fig.layout.shapes if s.type == "line" and s.x0 == s.x1}
+    assert marks == {day.strftime("%Y-%m-%d")}                    # the intervention is on its day, the other dropped
+    assert all(b.width for b in fig.data if b.type == "bar")      # a bar a day wide, even for a single day
+    assert ("text" in line.mode) == (len(d) <= co.DAY_LABELS_MAX)  # many days: no % label on every point
+    short = co.daily_fpy(d.head(5), 99.0, 3)
+    assert "text" in next(t for t in short.data if t.name == "Daily FPY").mode
+    # the weekly view stays one point per calendar week on a category axis
+    wk = co.weekly_fpy(demo_analysis.weekly, 99.0, 3)
+    assert list(next(t for t in wk.data if t.name == "Weekly FPY").x) == list(demo_analysis.weekly["CalendarWeek"])
+    assert wk.layout.xaxis2.type == "category"

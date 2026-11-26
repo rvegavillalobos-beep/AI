@@ -119,7 +119,8 @@ small project file and loaded again later — do that after logging a change, th
 | | **Data & Settings** | Data-quality report, reading options, nominal geometry, shift plan, project file. |
 | | **Reports** | A formatted Excel workbook for the team (with the set-ups and the fix-loop verdicts) and a detailed report (HTML) with the interactive charts. |
 
-The sidebar holds the filters (calendar weeks, battery type) and the quality rules (tolerance, FPY target,
+The sidebar holds the filters (calendar weeks, battery type), the **Daily FPY** switch (the Command Center's FPY
+trend per production day instead of per calendar week) and the quality rules (tolerance, FPY target,
 squareness limit, whether incomplete modules count as NOK, whether Z decides PASS/FAIL).
 
 ## Fixed from the original

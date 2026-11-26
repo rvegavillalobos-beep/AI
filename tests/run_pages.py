@@ -76,6 +76,11 @@ def main() -> int:
     results.append(scenario("command, Type M only", "command", before=type_m_only))
     results.append(scenario("compensation, Type M only", "compensation"))
 
+    # the sidebar switch: FPY per production day (stays on for the one-week runs below: a short date axis)
+    def daily_trend():
+        st.session_state["sb_daily"] = True
+    results.append(scenario("command, daily FPY", "command", before=daily_trend))
+
     def narrow_weeks():
         st.session_state["sb_types"] = "All types"
         labels = st.session_state["_sb_weeks_val"]

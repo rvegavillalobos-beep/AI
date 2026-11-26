@@ -65,7 +65,7 @@ def _v(key: str, value, name: str = "value") -> dict:
     return {} if key in st.session_state else {name: value}
 
 
-def filters_and_rules(ds) -> tuple[Settings, Scope, str, int]:
+def filters_and_rules(ds) -> tuple[Settings, Scope, str, int, str]:
     sb = st.sidebar
     ss = st.session_state
     runs = ds.runs
@@ -106,6 +106,9 @@ def filters_and_rules(ds) -> tuple[Settings, Scope, str, int]:
             wf = wt = keys[0] if keys else None
             st.caption(f"Calendar week: {w0}")
         week_label = w0 if w0 == w1 else f"{w0} – {w1}"
+        daily = st.toggle("Daily FPY", key="sb_daily", **_v("sb_daily", False),
+                          help="FPY trend on the Command Center: off = one point per calendar week, "
+                               "on = one point per production day.")
 
         st.subheader("Quality rules", divider="gray")
         file_lim = ds.limits.get("X") if ds.limits.get("X") == ds.limits.get("Y") else None
@@ -129,7 +132,9 @@ def filters_and_rules(ds) -> tuple[Settings, Scope, str, int]:
                 z_on = st.toggle("Also judge Z (height)", key="sb_zon", **_v("sb_zon", False),
                                  help="Off (original rule): only X and Y decide PASS/FAIL.")
                 z_lo, z_hi = float(zl[0]), float(zl[1])
-            ma = st.slider("Moving average (weeks)", 2, 10, key="sb_ma", **_v("sb_ma", 3))
+            ma = st.slider("Moving average (weeks / days)", 2, 10, key="sb_ma", **_v("sb_ma", 3),
+                           help="Points averaged in the FPY trend: weeks in the weekly view, production days "
+                                "in the daily one.")
         st.caption(f"ST020 Corner Analytics v{__version__} · analytics run in your browser session only")
 
     rules = Rules(spec_limit=float(spec), fpy_target=float(target), diag_tol=float(diag),
@@ -137,7 +142,7 @@ def filters_and_rules(ds) -> tuple[Settings, Scope, str, int]:
                   z_lo=z_lo, z_hi=z_hi)
     settings = Settings(rules=rules, nominals=state.nominals(), shifts=state.shifts())
     scope = Scope(types=types, week_from=wf, week_to=wt)
-    return settings, scope, week_label, int(ma)
+    return settings, scope, week_label, int(ma), "day" if daily else "week"
 
 
 def describe_load_error(e: Exception) -> str:

@@ -23,7 +23,8 @@ original RICKHARDV app are checked against a verbatim copy of its code in `tests
   its limits fails too.
 * **FPY** = share of modules whose Run 1 passes. Incomplete Run 1s count as NOK by default (original behaviour).
 * Weekly FPY carries a **Wilson 95 % interval**; weeks with fewer than 5 modules are marked as low sample. A
-  *near miss* is a PASS with less than 0.5 mm margin to the limit.
+  *near miss* is a PASS with less than 0.5 mm margin to the limit. The daily view (sidebar switch) applies the
+  same rules per production day; its moving average runs over production days.
 
 ## 3. Error anatomy
 
